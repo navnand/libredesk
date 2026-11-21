@@ -4,7 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import api from '@widget/api/index.js'
 import { useHelpStore } from './help.js'
 
-vi.mock('@widget/api/index.js', () => ({ default: { getHelp: vi.fn() } }))
+vi.mock('@widget/api/index.js', () => ({ default: { getHelp: vi.fn(), searchHelp: vi.fn() } }))
 
 const article = (id) => ({ id, title: `Article ${id}`, slug: `a-${id}` })
 const help = (extra) => ({
@@ -74,5 +74,67 @@ describe('help articles per page', () => {
     await store.setPage('https://app.example.com/c')
     expect(store.featured.map((a) => a.id)).toEqual([1])
     expect(store.failed).toBe(false)
+  })
+
+  test('a reset forgets that Home opened the article', () => {
+    const store = useHelpStore()
+    store.returnHome = true
+    store.reset()
+    expect(store.returnHome).toBe(false)
+  })
+})
+
+describe('search on the Home screen', () => {
+  const results = (...ids) => ({ data: { data: ids.map(article) } })
+
+  test('shows the results for the query', async () => {
+    const store = useHelpStore()
+    api.searchHelp.mockResolvedValueOnce(results(2, 3))
+    store.homeQuery = ' print '
+    await store.searchHome()
+    expect(api.searchHelp).toHaveBeenCalledWith('print', undefined)
+    expect(store.homeResults.map((a) => a.id)).toEqual([2, 3])
+    expect(store.homeSearching).toBe(false)
+  })
+
+  test('an older reply never replaces a newer one', async () => {
+    const store = useHelpStore()
+    let first
+    api.searchHelp.mockReturnValueOnce(new Promise((resolve) => (first = resolve)))
+    api.searchHelp.mockResolvedValueOnce(results(1))
+    store.homeQuery = 'pr'
+    const slow = store.searchHome()
+    store.homeQuery = 'print'
+    await store.searchHome()
+    first(results(3))
+    await slow
+    expect(store.homeResults.map((a) => a.id)).toEqual([1])
+  })
+
+  test('an empty query clears the results without a request', async () => {
+    const store = useHelpStore()
+    store.homeResults = [article(1)]
+    store.homeQuery = '  '
+    await store.searchHome()
+    expect(api.searchHelp).not.toHaveBeenCalled()
+    expect(store.homeResults).toBe(null)
+  })
+
+  test('a failed search says so', async () => {
+    const store = useHelpStore()
+    api.searchHelp.mockRejectedValueOnce(new Error('offline'))
+    store.homeQuery = 'print'
+    await store.searchHome()
+    expect(store.homeSearchFailed).toBe(true)
+    expect(store.homeResults).toBe(null)
+  })
+
+  test('a reset clears the Home search', () => {
+    const store = useHelpStore()
+    store.homeQuery = 'print'
+    store.homeResults = [article(1)]
+    store.reset()
+    expect(store.homeQuery).toBe('')
+    expect(store.homeResults).toBe(null)
   })
 })

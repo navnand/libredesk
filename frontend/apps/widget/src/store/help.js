@@ -21,6 +21,14 @@ export const useHelpStore = defineStore('help', () => {
   const scrollTop = ref(0)
   const pendingArticle = ref(null)
   const focusSearch = ref(false)
+  // Set when Home opened the article, so Back returns to Home.
+  const returnHome = ref(false)
+  // Search on the Home screen, kept apart from the Help view's own search.
+  const homeQuery = ref('')
+  const homeResults = ref(null)
+  const homeSearching = ref(false)
+  const homeSearchFailed = ref(false)
+  let homeSearchRequest = 0
   const expandArticles = ref(readExpandArticles())
   const identity = ref(0)
   // The host page the widget is on; page rules pick articles by it.
@@ -51,6 +59,12 @@ export const useHelpStore = defineStore('help', () => {
     scrollTop.value = 0
     pendingArticle.value = null
     focusSearch.value = false
+    returnHome.value = false
+    homeSearchRequest++
+    homeQuery.value = ''
+    homeResults.value = null
+    homeSearching.value = false
+    homeSearchFailed.value = false
     data.value = null
     failed.value = false
     query.value = ''
@@ -91,6 +105,29 @@ export const useHelpStore = defineStore('help', () => {
       if (request === generation) loading.value = false
     }
   }
+  // Only the latest search counts; a reset or a newer search drops older replies.
+  const searchHome = async () => {
+    const query = homeQuery.value.trim()
+    const request = ++homeSearchRequest
+    homeSearchFailed.value = false
+    if (!query) {
+      homeResults.value = null
+      homeSearching.value = false
+      return
+    }
+    homeSearching.value = true
+    try {
+      const response = await api.searchHelp(query, data.value?.locale)
+      if (request === homeSearchRequest) homeResults.value = response.data.data || []
+    } catch {
+      if (request === homeSearchRequest) {
+        homeResults.value = null
+        homeSearchFailed.value = true
+      }
+    } finally {
+      if (request === homeSearchRequest) homeSearching.value = false
+    }
+  }
   const setExpandArticles = (value) => {
     expandArticles.value = value
     try { localStorage.setItem(EXPAND_KEY, String(value)) } catch { /* storage blocked */ }
@@ -99,6 +136,12 @@ export const useHelpStore = defineStore('help', () => {
     requestedLocale,
     fallbackLocale,
     focusSearch,
+    returnHome,
+    homeQuery,
+    homeResults,
+    homeSearching,
+    homeSearchFailed,
+    searchHome,
     expandArticles,
     setExpandArticles,
     navigationHistory,

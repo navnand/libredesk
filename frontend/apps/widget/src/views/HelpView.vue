@@ -20,6 +20,8 @@ const { t } = useI18n()
 let mounted = true
 onUnmounted(() => {
   mounted = false
+  // Back only returns Home straight after Home opened the article.
+  help.returnHome = false
 })
 const valid = (identity) => mounted && identity === help.identity
 const busy = ref(false)
@@ -119,6 +121,12 @@ const back = async () => {
   let selector
   if (help.article) {
     help.article = articleHistory.value.pop() || null
+    if (!help.article && help.returnHome) {
+      help.returnHome = false
+      originArticleID.value = null
+      widget.navigateToHome()
+      return
+    }
     if (!help.article) {
       selector = `[data-help-article="${originArticleID.value}"]`
       if (widget.isExpanded) widget.collapseWidget()
