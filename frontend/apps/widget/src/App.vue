@@ -219,6 +219,7 @@ const setupParentMessageListeners = () => {
       await proactive.event(event.data.event, event.data.id)
     } else if (event.data.type === 'PAGE_VISIT') {
       sendPageVisit(event.data.url, event.data.title)
+      if (widgetStore.config.help?.help_center_id) help.setPage(event.data.url)
     } else if (event.data.type === 'OPEN_CONVERSATION') {
       if (!chatStore.getConversations.some(conversation => conversation.uuid === event.data.uuid)) return
       widgetStore.navigateToMessages()

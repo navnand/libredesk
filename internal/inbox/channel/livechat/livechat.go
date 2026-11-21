@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 
@@ -124,10 +125,68 @@ type HelpAudience struct {
 }
 
 type HelpConfig struct {
-	HelpCenterID int          `json:"help_center_id"`
-	Visitors     HelpAudience `json:"visitors"`
-	Users        HelpAudience `json:"users"`
-	FeaturedIDs  []int        `json:"featured_ids"`
+	HelpCenterID int            `json:"help_center_id"`
+	Visitors     HelpAudience   `json:"visitors"`
+	Users        HelpAudience   `json:"users"`
+	FeaturedIDs  []int          `json:"featured_ids"`
+	PageRules    []HelpPageRule `json:"page_rules"`
+}
+
+// Limits for page rules, mirrored in the admin form schema.
+const (
+	MaxHelpPageRules        = 100
+	MaxHelpPageRulePatterns = 20
+	MaxHelpPageRuleArticles = 10
+)
+
+// HelpPageRule picks the help articles shown on matching pages. Pages use the
+// same patterns as proactive messages; rules are checked in order and the
+// first match wins.
+type HelpPageRule struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Pages      []string `json:"pages"`
+	ArticleIDs []int    `json:"article_ids"`
+}
+
+// Validate returns the name of the first invalid field, or nil.
+func (r HelpPageRule) Validate() error {
+	if strings.TrimSpace(r.ID) == "" || len(r.ID) > 64 {
+		return fmt.Errorf("id")
+	}
+	if strings.TrimSpace(r.Name) == "" || len(r.Name) > 128 {
+		return fmt.Errorf("name")
+	}
+	if len(r.Pages) == 0 || len(r.Pages) > MaxHelpPageRulePatterns {
+		return fmt.Errorf("pages")
+	}
+	for _, pattern := range r.Pages {
+		if strings.TrimSpace(pattern) == "" || len(pattern) > 2048 {
+			return fmt.Errorf("pages")
+		}
+	}
+	if len(r.ArticleIDs) > MaxHelpPageRuleArticles {
+		return fmt.Errorf("articles")
+	}
+	for _, id := range r.ArticleIDs {
+		if id <= 0 {
+			return fmt.Errorf("articles")
+		}
+	}
+	return nil
+}
+
+// MatchPage returns the first rule whose pages match pageURL.
+func (h HelpConfig) MatchPage(pageURL string) (HelpPageRule, bool) {
+	if pageURL == "" {
+		return HelpPageRule{}, false
+	}
+	for _, rule := range h.PageRules {
+		if proactive.MatchesURL(rule.Pages, pageURL) {
+			return rule, true
+		}
+	}
+	return HelpPageRule{}, false
 }
 
 type AudienceConfig struct {
@@ -350,6 +409,17 @@ func (c *Config) fillEmptyLists() {
 	}
 	if c.Help.FeaturedIDs == nil {
 		c.Help.FeaturedIDs = []int{}
+	}
+	if c.Help.PageRules == nil {
+		c.Help.PageRules = []HelpPageRule{}
+	}
+	for i := range c.Help.PageRules {
+		if c.Help.PageRules[i].Pages == nil {
+			c.Help.PageRules[i].Pages = []string{}
+		}
+		if c.Help.PageRules[i].ArticleIDs == nil {
+			c.Help.PageRules[i].ArticleIDs = []int{}
+		}
 	}
 	if c.HomeApps == nil {
 		c.HomeApps = []HomeApp{}

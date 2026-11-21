@@ -122,8 +122,45 @@ describe('Livechat Inbox Form Schema', () => {
       help_center_id: 4,
       visitors: { tab: true },
       users: { tab: false },
-      featured_ids: [13, 8, 21]
+      featured_ids: [13, 8, 21],
+      page_rules: []
     })
+  })
+
+  test('page rules keep their order and drop blank page lines', () => {
+    const parsed = schema.parse(
+      withConfig({
+        help: {
+          help_center_id: 4,
+          visitors: { tab: true },
+          users: { tab: true },
+          featured_ids: [],
+          page_rules: [
+            { id: 'a', name: ' Tasks ', pages: ['/workspace/*/tasks*', ' ', ''], article_ids: [3] },
+            { id: 'b', name: 'Workspace', pages: ['/workspace/*'], article_ids: [] }
+          ]
+        }
+      })
+    )
+    expect(parsed.config.help.page_rules).toEqual([
+      { id: 'a', name: 'Tasks', pages: ['/workspace/*/tasks*'], article_ids: [3] },
+      { id: 'b', name: 'Workspace', pages: ['/workspace/*'], article_ids: [] }
+    ])
+  })
+
+  test.each([
+    ['no pages', { id: 'a', name: 'x', pages: [' '], article_ids: [] }],
+    ['no name', { id: 'a', name: ' ', pages: ['/a'], article_ids: [] }],
+    ['too many articles', { id: 'a', name: 'x', pages: ['/a'], article_ids: Array.from({ length: 11 }, (_, i) => i + 1) }],
+    ['too many patterns', { id: 'a', name: 'x', pages: Array.from({ length: 21 }, () => '/a'), article_ids: [] }]
+  ])('page rules reject %s', (_, rule) => {
+    expect(() =>
+      schema.parse(
+        withConfig({
+          help: { help_center_id: 4, visitors: { tab: true }, users: { tab: true }, featured_ids: [], page_rules: [rule] }
+        })
+      )
+    ).toThrow()
   })
 
   test('help tab rejects more than ten featured articles', () => {

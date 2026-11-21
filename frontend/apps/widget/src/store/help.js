@@ -23,6 +23,8 @@ export const useHelpStore = defineStore('help', () => {
   const focusSearch = ref(false)
   const expandArticles = ref(readExpandArticles())
   const identity = ref(0)
+  // The host page the widget is on; page rules pick articles by it.
+  const pageURL = ref('')
   let generation = 0
   const articles = computed(() => {
     const collect = (nodes) =>
@@ -30,10 +32,15 @@ export const useHelpStore = defineStore('help', () => {
     return collect(data.value?.tree)
   })
   const available = computed(() => !!data.value && articles.value.length > 0)
+  const pick = (ids) =>
+    (ids || []).map((id) => articles.value.find((article) => article.id === id)).filter(Boolean)
+  // Articles from the page rule matching this page, when any are available.
+  const pageArticles = computed(() => pick(data.value?.page_article_ids))
+  const pageMatch = computed(() => pageArticles.value.length > 0)
+  const hasPageRules = computed(() => !!data.value?.page_rules)
   const featured = computed(() => {
-    const picked = (data.value?.featured_ids || [])
-      .map((id) => articles.value.find((article) => article.id === id))
-      .filter(Boolean)
+    if (pageMatch.value) return pageArticles.value
+    const picked = pick(data.value?.featured_ids)
     // Featured articles outside the visitor's locale are missing from the tree.
     return picked.length ? picked : data.value?.popular || []
   })
@@ -57,13 +64,29 @@ export const useHelpStore = defineStore('help', () => {
     loading.value = true
     failed.value = false
     try {
-      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value)
+      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, pageURL.value)
       if (request === generation) data.value = response.data.data
     } catch {
       if (request === generation) {
         data.value = null
         failed.value = true
       }
+    } finally {
+      if (request === generation) loading.value = false
+    }
+  }
+  // The host page changed. Only inboxes with page rules need fresh articles; the
+  // refresh runs in the background so an open Help view doesn't flash.
+  const setPage = async (url) => {
+    if (typeof url !== 'string' || url === pageURL.value) return
+    pageURL.value = url
+    if (!data.value?.page_rules) return
+    const request = ++generation
+    try {
+      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, url)
+      if (request === generation) data.value = response.data.data
+    } catch {
+      // Keep the current articles; the next page change tries again.
     } finally {
       if (request === generation) loading.value = false
     }
@@ -92,6 +115,10 @@ export const useHelpStore = defineStore('help', () => {
     articles,
     available,
     featured,
+    pageMatch,
+    hasPageRules,
+    pageURL,
+    setPage,
     load,
     reset
   }

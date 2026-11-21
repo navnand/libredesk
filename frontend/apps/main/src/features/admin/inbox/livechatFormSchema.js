@@ -113,7 +113,8 @@ export const defaultWidgetHelp = () => ({
   help_center_id: 0,
   visitors: { tab: true },
   users: { tab: true },
-  featured_ids: []
+  featured_ids: [],
+  page_rules: []
 })
 export const createWidgetConditionsSchema = (t) =>
   z.object({
@@ -252,7 +253,26 @@ export const createFormSchema = (t) =>
           help_center_id: z.number().int().min(0),
           visitors: helpAudience,
           users: helpAudience,
-          featured_ids: z.array(z.number().int().positive()).max(10)
+          featured_ids: z.array(z.number().int().positive()).max(10),
+          page_rules: z
+            .array(
+              z.object({
+                id: z.string().min(1).max(64),
+                name: z
+                  .string()
+                  .trim()
+                  .min(1, { message: t('globals.messages.required') })
+                  .max(128),
+                pages: z
+                  .array(z.string().max(2048))
+                  .transform((items) => items.map((item) => item.trim()).filter(Boolean))
+                  .refine((items) => items.length >= 1, t('globals.messages.required'))
+                  .refine((items) => items.length <= 20, t('widget.campaignUrlLimit')),
+                article_ids: z.array(z.number().int().positive()).max(10)
+              })
+            )
+            .max(100)
+            .default([])
         })
         .default(defaultWidgetHelp),
       brand_name: z.string().min(1, { message: t('globals.messages.required') }),

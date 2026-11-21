@@ -88,6 +88,12 @@ func ValidateConditions(group amodels.RuleGroup) error {
 	return nil
 }
 
+// MatchesURL reports whether raw matches any of the page patterns, the way
+// proactive messages read them. Help page rules use it too.
+func MatchesURL(patterns []string, raw string) bool {
+	return matchesURL(patterns, raw)
+}
+
 func matchesURL(patterns []string, raw string) bool {
 	u, err := url.Parse(raw)
 	if err != nil || u.Host == "" || u.Scheme != "https" && u.Scheme != "http" {

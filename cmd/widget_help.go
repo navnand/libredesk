@@ -50,12 +50,20 @@ func handleWidgetHelp(r *fastglue.Request) error {
 		hideArticleAuthor(helpCenterTheme(helpCenter), &popular[i])
 	}
 	config, _ := getWidgetConfig(r)
-	return r.SendEnvelope(map[string]any{
+	resp := map[string]any{
 		"slug": helpCenter.Slug, "name": helpCenter.Name, "locale": locale,
 		"url":  helpCenterBaseURL(app, helpCenter) + helpCenterPathPrefix(helpCenter),
 		"tree": tree.Tree, "popular": popular, "audience": audience, "locales": helpCenterLocales(helpCenter),
 		"featured_ids": config.Help.FeaturedIDs,
-	})
+		"page_rules":   len(config.Help.PageRules) > 0,
+	}
+	// Page rules: the first rule matching the visitor's page picks the articles.
+	// The widget falls back to featured_ids when none of them are available.
+	if rule, ok := config.Help.MatchPage(string(r.RequestCtx.QueryArgs().Peek("page_url"))); ok {
+		resp["page_rule"] = rule.Name
+		resp["page_article_ids"] = rule.ArticleIDs
+	}
+	return r.SendEnvelope(resp)
 }
 
 func handleWidgetHelpSearch(r *fastglue.Request) error {

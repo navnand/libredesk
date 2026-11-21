@@ -29,6 +29,9 @@ const open = (article) => {
       {{ $t('widget.searchArticles') }}
       <Search class="size-4" aria-hidden="true" />
     </Button>
+    <p v-if="help.hasPageRules && help.featured.length" class="px-2 pt-2 pb-0.5 text-xs text-muted-foreground">
+      {{ help.pageMatch ? $t('widget.helpForThisPage') : $t('helpCenter.popularArticles') }}
+    </p>
     <Button
       v-for="article in help.featured"
       :key="article.id"

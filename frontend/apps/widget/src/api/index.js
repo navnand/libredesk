@@ -137,9 +137,13 @@ const getChatConversations = () => http.get('/api/v1/widget/chat/conversations')
 const getChatConversation = (uuid) => http.get(`/api/v1/widget/chat/conversations/${uuid}`)
 const downloadTranscript = (uuid) =>
   http.get(`/api/v1/widget/chat/conversations/${uuid}/transcript`, { responseType: 'blob' })
-const getHelp = (locale, fallbackLocale) =>
+const getHelp = (locale, fallbackLocale, pageURL) =>
   http.get('/api/v1/widget/chat/help', {
-    params: { locale, fallback_locale: fallbackLocale !== locale ? fallbackLocale : undefined }
+    params: {
+      locale,
+      fallback_locale: fallbackLocale !== locale ? fallbackLocale : undefined,
+      page_url: pageURL || undefined
+    }
   })
 const searchHelp = (q, locale) =>
   http.get('/api/v1/widget/chat/help/search', { params: { q, locale } })

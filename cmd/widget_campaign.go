@@ -249,6 +249,19 @@ func validateWidgetFeatures(app *App, config livechat.Config) error {
 	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || len(config.Campaigns) > 50 {
 		return campaignInputError(app)
 	}
+	if len(config.Help.PageRules) > livechat.MaxHelpPageRules {
+		return campaignInputError(app)
+	}
+	ruleIDs := make(map[string]bool)
+	for _, rule := range config.Help.PageRules {
+		if err := rule.Validate(); err != nil {
+			return envelope.NewError(envelope.InputError, app.i18n.Ts("admin.inbox.livechat.pageRuleInvalid", "name", rule.Name, "field", err.Error()), nil)
+		}
+		if ruleIDs[rule.ID] {
+			return campaignInputError(app)
+		}
+		ruleIDs[rule.ID] = true
+	}
 	if _, err := parseCampaignCooldown(config.CampaignCooldown); err != nil {
 		return campaignInputError(app)
 	}

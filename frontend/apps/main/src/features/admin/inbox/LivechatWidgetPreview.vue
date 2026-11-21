@@ -270,6 +270,16 @@
                           {{ $t('widget.searchArticles') }}
                           <Search class="size-4" aria-hidden="true" />
                         </Button>
+                        <p
+                          v-if="hasPageRules && featuredArticles.length"
+                          class="px-2 pt-2 pb-0.5 text-xs text-muted-foreground"
+                        >
+                          {{
+                            pageRuleArticles.length
+                              ? $t('widget.helpForThisPage')
+                              : $t('helpCenter.popularArticles')
+                          }}
+                        </p>
                         <Button
                           v-for="article in featuredArticles"
                           :key="article.id"
@@ -529,6 +539,7 @@ import {
 import HelpCollectionList from '@shared-ui/components/HelpCollectionList.vue'
 import { hexToHSL, getContrastingHSL } from '@shared-ui/utils/color'
 import { renderTemplate } from '@shared-ui/utils/string'
+import { matchPageRule } from './pageRules.js'
 
 const DEFAULT_LAUNCHER_LOGO = '/static/public/launcher-logo.png'
 const HEX_COLOR = /^#([0-9a-f]{6}|[0-9a-f]{3})$/i
@@ -671,10 +682,19 @@ const helpAudience = computed(() => helpConfig.value[props.userType] || {})
 const helpEnabled = computed(() => Boolean(helpConfig.value.help_center_id))
 const showHelpTab = computed(() => helpEnabled.value && Boolean(helpAudience.value.tab))
 
-const featuredArticles = computed(() =>
-  (helpConfig.value.featured_ids || [])
+const pickArticles = (ids) =>
+  (ids || [])
     .map((id) => (props.config.help_articles || []).find((article) => article.id === id))
     .filter(Boolean)
+// Mirrors the widget: the page's rule articles when any are available, else the defaults.
+const pageRuleArticles = computed(() => {
+  const url = props.config.preview_page_url
+  const rule = url ? matchPageRule(helpConfig.value.page_rules, url) : null
+  return rule ? pickArticles(rule.article_ids) : []
+})
+const hasPageRules = computed(() => (helpConfig.value.page_rules || []).length > 0)
+const featuredArticles = computed(() =>
+  pageRuleArticles.value.length ? pageRuleArticles.value : pickArticles(helpConfig.value.featured_ids)
 )
 
 const helpPath = ref([])

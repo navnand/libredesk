@@ -1,0 +1,38 @@
+# Builds the oss branch into an image like upstream's (same runtime layout as
+# ./Dockerfile), from source instead of a goreleaser binary.
+# docker build -f Dockerfile.oss --build-arg VERSION=v2.9.2-oss1 .
+
+FROM node:24 AS frontend
+ENV PNPM_HOME=/pnpm CYPRESS_INSTALL_BINARY=0
+RUN corepack enable
+WORKDIR /src
+COPY . .
+ARG VERSION=v0.0.0
+RUN cd frontend && pnpm install --frozen-lockfile \
+ && VITE_APP_VERSION="${VERSION}" pnpm build:main \
+ && VITE_APP_VERSION="${VERSION}" pnpm build:widget \
+ && pnpm build:widget-loader
+
+FROM golang:1.27.3 AS backend
+WORKDIR /src
+RUN go install github.com/knadh/stuffbin/...@latest
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+COPY --from=frontend /src/frontend/dist frontend/dist
+COPY --from=frontend /src/static/widget.min.js static/widget.min.js
+ARG VERSION=v0.0.0
+ARG COMMIT=unknown
+RUN CGO_ENABLED=0 go build \
+      -ldflags="-X 'main.buildString=${VERSION} (#${COMMIT})' -X 'main.versionString=${VERSION}' -X 'github.com/abhinavxd/libredesk/internal/version.Version=${VERSION}' -s -w" \
+      -o libredesk ./cmd \
+ && stuffbin -a stuff -in libredesk -out libredesk \
+      frontend/dist i18n schema.sql static/email-templates static/public static/widget.min.js:static/widget.js
+
+FROM alpine:3.18
+RUN apk --no-cache add ca-certificates tzdata
+WORKDIR /libredesk
+COPY --from=backend /src/libredesk .
+COPY config.sample.toml config.toml
+EXPOSE 9000
+CMD ["./libredesk"]
