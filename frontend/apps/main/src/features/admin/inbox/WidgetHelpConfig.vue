@@ -276,7 +276,7 @@ const articleCount = (rule) => (rule.article_ids || []).length
                     placeholder="/account/*/settings*"
                     @update:model-value="updateRule(rule.id, 'pages', $event.split('\n'))"
                   />
-                  <p class="ui-description">{{ t('widget.urlPatternsHint') }}</p>
+                  <p class="ui-description">{{ t('widget.pageRulePagesHint') }}</p>
                 </div>
                 <div class="space-y-2">
                   <Label>{{ t('widget.pageRuleArticles') }}</Label>

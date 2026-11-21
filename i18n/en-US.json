@@ -1841,6 +1841,7 @@
   "widget.pageRuleName": "Rule name",
   "widget.pageRuleNoMatch": "No rule matches this page. Default articles show.",
   "widget.pageRulePages": "Pages",
+  "widget.pageRulePagesHint": "One URL or path per line, at least one. Use * to match any characters, e.g. /account/*/settings*. A path matches on any site; start with a host (app.example.com/...) to match only that site.",
   "widget.pageRules": "Page rules",
   "widget.pageRulesHint": "Show different articles on different pages. Rules are checked from top to bottom and the first match wins. If a matching rule has no available articles, the default articles show.",
   "widget.prechatForm.continueToHuman": "Continue to a human",
