@@ -91,6 +91,20 @@ describe('help articles per page', () => {
     expect(store.failed).toBe(false)
   })
 
+  test('a page that arrives during the first load wins over the page-less reply', async () => {
+    const store = useHelpStore()
+    let finishFirst
+    api.getHelp.mockReturnValueOnce(new Promise((resolve) => { finishFirst = resolve }))
+    const first = store.load()
+    api.getHelp.mockResolvedValueOnce(help({ page_rules: true, page_article_ids: [1] }))
+    await store.setPage('https://app.example.com/workspace/3/tasks', { role: 'viewer' })
+    expect(api.getHelp).toHaveBeenLastCalledWith('en-US', 'en-US', 'https://app.example.com/workspace/3/tasks', '{"role":"viewer"}')
+    finishFirst(help({ page_rules: true }))
+    await first
+    expect(store.featured.map((a) => a.id)).toEqual([1])
+    expect(store.loading).toBe(false)
+  })
+
   test('a reset forgets that Home opened the article', () => {
     const store = useHelpStore()
     store.returnHome = true

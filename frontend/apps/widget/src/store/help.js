@@ -106,6 +106,9 @@ export const useHelpStore = defineStore('help', () => {
     if (url === pageURL.value && ctx === pageContext.value) return
     pageURL.value = url
     pageContext.value = ctx
+    // The first load may still be running without the page; start it again
+    // with the page so its page-less reply can't win.
+    if (loading.value && !data.value) return load()
     if (!data.value?.page_rules) return
     const request = ++generation
     try {
