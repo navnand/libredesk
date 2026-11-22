@@ -24,13 +24,28 @@ beforeEach(() => {
 })
 
 describe('help articles per page', () => {
+  test('sends the page context with the page address, and refreshes when only the context changes', async () => {
+    const store = useHelpStore()
+    api.getHelp.mockResolvedValueOnce(help({ page_rules: true }))
+    await store.load()
+    api.getHelp.mockResolvedValue(help({ page_rules: true, page_article_ids: [1] }))
+    await store.setPage('https://app.example.com/workspace/3/tasks', { area: 'workspace', role: 'viewer' })
+    expect(api.getHelp).toHaveBeenLastCalledWith('en-US', 'en-US', 'https://app.example.com/workspace/3/tasks', '{"area":"workspace","role":"viewer"}')
+    await store.setPage('https://app.example.com/workspace/3/tasks', { area: 'workspace', role: 'viewer' })
+    expect(api.getHelp).toHaveBeenCalledTimes(2)
+    await store.setPage('https://app.example.com/workspace/3/tasks', { area: 'workspace', role: 'editor' })
+    expect(api.getHelp).toHaveBeenCalledTimes(3)
+    await store.setPage('https://app.example.com/workspace/3/tasks', ['not', 'an', 'object'])
+    expect(api.getHelp).toHaveBeenLastCalledWith('en-US', 'en-US', 'https://app.example.com/workspace/3/tasks', '')
+  })
+
   test('sends the page address and shows the matching rule articles', async () => {
     const store = useHelpStore()
     await store.setPage('https://app.example.com/workspace/65/tasks')
     api.getHelp.mockResolvedValueOnce(help({ page_rules: true, page_rule: 'Tasks', page_article_ids: [1, 99] }))
     await store.load()
 
-    expect(api.getHelp).toHaveBeenCalledWith('en-US', 'en-US', 'https://app.example.com/workspace/65/tasks')
+    expect(api.getHelp).toHaveBeenCalledWith('en-US', 'en-US', 'https://app.example.com/workspace/65/tasks', '')
     expect(store.pageMatch).toBe(true)
     expect(store.featured.map((a) => a.id)).toEqual([1])
   })
@@ -58,7 +73,7 @@ describe('help articles per page', () => {
     await store.load()
     api.getHelp.mockResolvedValueOnce(help({ page_rules: true, page_article_ids: [3] }))
     await store.setPage('https://app.example.com/b')
-    expect(api.getHelp).toHaveBeenLastCalledWith('en-US', 'en-US', 'https://app.example.com/b')
+    expect(api.getHelp).toHaveBeenLastCalledWith('en-US', 'en-US', 'https://app.example.com/b', '')
     expect(store.featured.map((a) => a.id)).toEqual([3])
     expect(store.loading).toBe(false)
 

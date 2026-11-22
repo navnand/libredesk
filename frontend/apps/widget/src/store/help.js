@@ -31,8 +31,10 @@ export const useHelpStore = defineStore('help', () => {
   let homeSearchRequest = 0
   const expandArticles = ref(readExpandArticles())
   const identity = ref(0)
-  // The host page the widget is on; page rules pick articles by it.
+  // The host page the widget is on, and what the site says about it (as JSON);
+  // page rules pick articles by them.
   const pageURL = ref('')
+  const pageContext = ref('')
   let generation = 0
   const articles = computed(() => {
     const collect = (nodes) =>
@@ -78,7 +80,7 @@ export const useHelpStore = defineStore('help', () => {
     loading.value = true
     failed.value = false
     try {
-      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, pageURL.value)
+      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, pageURL.value, pageContext.value)
       if (request === generation) data.value = response.data.data
     } catch {
       if (request === generation) {
@@ -91,13 +93,23 @@ export const useHelpStore = defineStore('help', () => {
   }
   // The host page changed. Only inboxes with page rules need fresh articles; the
   // refresh runs in the background so an open Help view doesn't flash.
-  const setPage = async (url) => {
-    if (typeof url !== 'string' || url === pageURL.value) return
+  const setPage = async (url, context) => {
+    if (typeof url !== 'string') return
+    let ctx = ''
+    if (context && typeof context === 'object' && !Array.isArray(context)) {
+      try {
+        ctx = JSON.stringify(context)
+      } catch {
+        ctx = ''
+      }
+    }
+    if (url === pageURL.value && ctx === pageContext.value) return
     pageURL.value = url
+    pageContext.value = ctx
     if (!data.value?.page_rules) return
     const request = ++generation
     try {
-      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, url)
+      const response = await api.getHelp(requestedLocale.value, fallbackLocale.value, url, ctx)
       if (request === generation) data.value = response.data.data
     } catch {
       // Keep the current articles; the next page change tries again.
@@ -161,6 +173,7 @@ export const useHelpStore = defineStore('help', () => {
     pageMatch,
     hasPageRules,
     pageURL,
+    pageContext,
     setPage,
     load,
     reset

@@ -914,8 +914,10 @@
                   :articles="helpArticles"
                   :failed="helpFailed"
                   :preview-page="previewPage"
+                  :preview-context="previewContext"
                   @update:model-value="form.setFieldValue('config.help', $event, false)"
                   @update:preview-page="previewPage = $event"
+                  @update:preview-context="previewContext = $event"
                 />
                 <p
                   v-if="Object.keys(form.errors.value).some((key) => key.startsWith('config.help'))"
@@ -1927,6 +1929,7 @@ const {
 
 // "Preview as page": the preview shows the help articles that page's rule picks.
 const previewPage = ref('')
+const previewContext = ref('')
 
 // The campaign the admin is editing, mirrored in the preview as an invitation card.
 const previewCampaign = ref(null)
@@ -1952,6 +1955,7 @@ const previewConfig = computed(() => {
     help_tree: helpTree.value,
     help_articles: helpArticles.value,
     preview_page_url: previewPage.value.trim(),
+    preview_page_context: previewContext.value,
     preview_campaign: activeSection.value === 'campaigns' ? previewCampaign.value : null
   }
 })

@@ -19,7 +19,13 @@ import { GripVertical, X, ChevronDown, ChevronRight, Plus } from 'lucide-vue-nex
 import Draggable from 'vuedraggable'
 import ArticleListEditor from './ArticleListEditor.vue'
 import { newCampaignId } from './livechatFormSchema.js'
-import { matchPageRule, MAX_PAGE_RULES, MAX_PAGE_RULE_ARTICLES } from './pageRules.js'
+import {
+  matchPageRule,
+  parseConditions,
+  formatConditions,
+  MAX_PAGE_RULES,
+  MAX_PAGE_RULE_ARTICLES
+} from './pageRules.js'
 
 const reducedMotion = usePreferredReducedMotion()
 
@@ -31,9 +37,10 @@ const props = defineProps({
   centers: { type: Array, default: () => [] },
   articles: { type: Array, default: () => [] },
   failed: { type: Boolean, default: false },
-  previewPage: { type: String, default: '' }
+  previewPage: { type: String, default: '' },
+  previewContext: { type: String, default: '' }
 })
-const emit = defineEmits(['update:modelValue', 'update:previewPage'])
+const emit = defineEmits(['update:modelValue', 'update:previewPage', 'update:previewContext'])
 const { t } = useI18n()
 
 const update = (key, value) => emit('update:modelValue', { ...props.modelValue, [key]: value })
@@ -69,7 +76,8 @@ const visibleRules = computed(() => {
   return rules.value.filter(
     (rule) =>
       rule.name.toLowerCase().includes(needle) ||
-      (rule.pages || []).some((page) => page.toLowerCase().includes(needle))
+      (rule.pages || []).some((page) => page.toLowerCase().includes(needle)) ||
+      formatConditions(rule.when).toLowerCase().includes(needle)
   )
 })
 
@@ -81,15 +89,24 @@ const toggle = (id) => {
   expanded.value = next
 }
 const addRule = () => {
-  const rule = { id: newCampaignId(), name: t('widget.newPageRule'), pages: [], article_ids: [] }
+  const rule = { id: newCampaignId(), name: t('widget.newPageRule'), pages: [], when: [], article_ids: [] }
   setRules([...rules.value, rule])
   expanded.value = new Set([...expanded.value, rule.id])
   filter.value = ''
 }
 
 const matched = computed(() =>
-  props.previewPage.trim() ? matchPageRule(rules.value, props.previewPage.trim()) : null
+  props.previewPage.trim() ? matchPageRule(rules.value, props.previewPage.trim(), props.previewContext) : null
 )
+// The "Only when" box keeps what the admin types; complete lines become conditions.
+const whenText = ref({})
+const conditionsText = (rule) => whenText.value[rule.id] ?? formatConditions(rule.when)
+const updateConditions = (rule, text) => {
+  whenText.value = { ...whenText.value, [rule.id]: text }
+  updateRule(rule.id, 'when', parseConditions(text))
+}
+const conditionSummary = (rule) =>
+  (rule.when || []).map((cond) => `${cond.key} = ${cond.values.join(', ')}`).join('; ')
 const firstPage = (rule) => (rule.pages || []).map((page) => page.trim()).find(Boolean) || ''
 const articleCount = (rule) => (rule.article_ids || []).length
 </script>
@@ -181,6 +198,15 @@ const articleCount = (rule) => (rule.article_ids || []).length
             }}
           </p>
           <p v-else class="ui-description">{{ t('widget.previewAsPageHint') }}</p>
+          <Label for="widget-preview-context">{{ t('widget.previewContext') }}</Label>
+          <Input
+            id="widget-preview-context"
+            class="max-w-md font-mono text-sm"
+            :model-value="previewContext"
+            placeholder='{"area": "workspace", "role": "editor"}'
+            @update:model-value="emit('update:previewContext', $event)"
+          />
+          <p class="ui-description">{{ t('widget.previewContextHint') }}</p>
         </div>
 
         <Input
@@ -240,6 +266,13 @@ const articleCount = (rule) => (rule.article_ids || []).length
                   <span class="text-xs text-muted-foreground font-mono truncate">
                     {{ firstPage(rule) }}
                   </span>
+                  <span
+                    v-if="(rule.when || []).length"
+                    class="text-xs text-muted-foreground font-mono truncate"
+                    data-rule-when
+                  >
+                    {{ t('widget.pageRuleWhenShort', { conditions: conditionSummary(rule) }) }}
+                  </span>
                   <span class="ml-auto shrink-0 text-xs text-muted-foreground">
                     {{ t('globals.messages.articleCount', { count: articleCount(rule) }, articleCount(rule)) }}
                   </span>
@@ -277,6 +310,18 @@ const articleCount = (rule) => (rule.article_ids || []).length
                     @update:model-value="updateRule(rule.id, 'pages', $event.split('\n'))"
                   />
                   <p class="ui-description">{{ t('widget.pageRulePagesHint') }}</p>
+                </div>
+                <div class="space-y-2">
+                  <Label :for="`page-rule-when-${rule.id}`">{{ t('widget.pageRuleWhen') }}</Label>
+                  <Textarea
+                    :id="`page-rule-when-${rule.id}`"
+                    class="font-mono text-sm"
+                    rows="2"
+                    :model-value="conditionsText(rule)"
+                    placeholder="role = viewer, editor"
+                    @update:model-value="updateConditions(rule, $event)"
+                  />
+                  <p class="ui-description">{{ t('widget.pageRuleWhenHint') }}</p>
                 </div>
                 <div class="space-y-2">
                   <Label>{{ t('widget.pageRuleArticles') }}</Label>

@@ -689,7 +689,7 @@ const pickArticles = (ids) =>
 // Mirrors the widget: the page's rule articles when any are available, else the defaults.
 const pageRuleArticles = computed(() => {
   const url = props.config.preview_page_url
-  const rule = url ? matchPageRule(helpConfig.value.page_rules, url) : null
+  const rule = url ? matchPageRule(helpConfig.value.page_rules, url, props.config.preview_page_context) : null
   return rule ? pickArticles(rule.article_ids) : []
 })
 const hasPageRules = computed(() => (helpConfig.value.page_rules || []).length > 0)

@@ -143,9 +143,27 @@ describe('Livechat Inbox Form Schema', () => {
       })
     )
     expect(parsed.config.help.page_rules).toEqual([
-      { id: 'a', name: 'Tasks', pages: ['/workspace/*/tasks*'], article_ids: [3] },
-      { id: 'b', name: 'Workspace', pages: ['/workspace/*'], article_ids: [] }
+      { id: 'a', name: 'Tasks', pages: ['/workspace/*/tasks*'], when: [], article_ids: [3] },
+      { id: 'b', name: 'Workspace', pages: ['/workspace/*'], when: [], article_ids: [] }
     ])
+  })
+
+  test('page rule conditions need a simple key and at least one value', () => {
+    const rules = (when) =>
+      withConfig({
+        help: {
+          help_center_id: 4,
+          visitors: { tab: true },
+          users: { tab: true },
+          featured_ids: [],
+          page_rules: [{ id: 'a', name: 'Tasks', pages: ['/workspace/*/tasks*'], when, article_ids: [] }]
+        }
+      })
+    const ok = schema.parse(rules([{ key: 'role', values: [' viewer ', 'guest'] }]))
+    expect(ok.config.help.page_rules[0].when).toEqual([{ key: 'role', values: ['viewer', 'guest'] }])
+    expect(schema.safeParse(rules([{ key: 'Role Type', values: ['viewer'] }])).success).toBe(false)
+    expect(schema.safeParse(rules([{ key: 'role', values: [] }])).success).toBe(false)
+    expect(schema.safeParse(rules(Array(6).fill({ key: 'role', values: ['viewer'] }))).success).toBe(false)
   })
 
   test.each([

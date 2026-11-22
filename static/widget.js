@@ -427,11 +427,25 @@
             return `min(${this.IFRAME_HEIGHT}, calc(100dvh - ${this.iframeBottomOffset() + this.LAUNCHER_IFRAME_GAP}px))`;
         }
 
+        // What the site says about the person and page (LibredeskSettings.pageContext),
+        // used by help page rules with conditions. The site may update
+        // window.LibredeskSettings.pageContext as the page changes.
+        pageContext () {
+            const ctx = (window.LibredeskSettings && window.LibredeskSettings.pageContext) || this.config.pageContext;
+            if (!ctx || typeof ctx !== 'object' || Array.isArray(ctx)) return null;
+            try {
+                return JSON.parse(JSON.stringify(ctx));
+            } catch (e) {
+                return null;
+            }
+        }
+
         sendPageInfo () {
             this.postToIframe({
                 type: 'PAGE_VISIT',
                 url: window.location.href,
-                title: document.title || ''
+                title: document.title || '',
+                context: this.pageContext()
             });
         }
 

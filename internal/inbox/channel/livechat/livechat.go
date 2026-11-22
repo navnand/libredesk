@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -134,19 +135,108 @@ type HelpConfig struct {
 
 // Limits for page rules, mirrored in the admin form schema.
 const (
-	MaxHelpPageRules        = 100
-	MaxHelpPageRulePatterns = 20
-	MaxHelpPageRuleArticles = 10
+	MaxHelpPageRules          = 100
+	MaxHelpPageRulePatterns   = 20
+	MaxHelpPageRuleArticles   = 10
+	MaxHelpPageRuleConditions = 5
+	MaxHelpConditionValues    = 20
+	MaxHelpContextBytes       = 2048
 )
+
+// helpConditionKeyRe limits condition keys to simple names like "role".
+var helpConditionKeyRe = regexp.MustCompile(`^[a-z0-9_]{1,64}$`)
 
 // HelpPageRule picks the help articles shown on matching pages. Pages use the
 // same patterns as proactive messages; rules are checked in order and the
-// first match wins.
+// first match wins. A rule with conditions (When) also needs the page context
+// the site sends to match every condition.
 type HelpPageRule struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Pages      []string `json:"pages"`
-	ArticleIDs []int    `json:"article_ids"`
+	ID         string              `json:"id"`
+	Name       string              `json:"name"`
+	Pages      []string            `json:"pages"`
+	When       []HelpPageCondition `json:"when"`
+	ArticleIDs []int               `json:"article_ids"`
+}
+
+// HelpPageCondition matches when the page context's Key has any of Values,
+// compared without regard to case. A context value may be one value or a
+// list of values (for example several teams).
+type HelpPageCondition struct {
+	Key    string   `json:"key"`
+	Values []string `json:"values"`
+}
+
+// HelpPageContext is what the embedding site says about the person and page,
+// for example {"area": "workspace", "role": "editor"}. Each key holds one or
+// more lower-cased values.
+type HelpPageContext map[string][]string
+
+// ParseHelpPageContext reads the page context JSON the widget sends. Strings,
+// numbers, booleans and lists of those are kept; anything else is ignored.
+// Bad or oversized input gives an empty context, so rules with conditions
+// simply don't match.
+func ParseHelpPageContext(raw string) HelpPageContext {
+	ctx := HelpPageContext{}
+	if raw == "" || len(raw) > MaxHelpContextBytes {
+		return ctx
+	}
+	var obj map[string]any
+	if err := json.Unmarshal([]byte(raw), &obj); err != nil {
+		return ctx
+	}
+	scalar := func(v any) (string, bool) {
+		switch t := v.(type) {
+		case string:
+			return strings.ToLower(strings.TrimSpace(t)), true
+		case bool:
+			return strconv.FormatBool(t), true
+		case float64:
+			return strconv.FormatFloat(t, 'f', -1, 64), true
+		}
+		return "", false
+	}
+	for key, value := range obj {
+		key = strings.ToLower(strings.TrimSpace(key))
+		if !helpConditionKeyRe.MatchString(key) {
+			continue
+		}
+		if list, ok := value.([]any); ok {
+			for _, item := range list {
+				if s, ok := scalar(item); ok {
+					ctx[key] = append(ctx[key], s)
+				}
+			}
+			continue
+		}
+		if s, ok := scalar(value); ok {
+			ctx[key] = []string{s}
+		}
+	}
+	return ctx
+}
+
+// matches reports whether every condition finds one of its values in ctx.
+func (r HelpPageRule) matches(ctx HelpPageContext) bool {
+	for _, cond := range r.When {
+		have := ctx[strings.ToLower(cond.Key)]
+		found := false
+		for _, want := range cond.Values {
+			want = strings.ToLower(strings.TrimSpace(want))
+			for _, v := range have {
+				if v == want {
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // Validate returns the name of the first invalid field, or nil.
@@ -165,6 +255,19 @@ func (r HelpPageRule) Validate() error {
 			return fmt.Errorf("pages")
 		}
 	}
+	if len(r.When) > MaxHelpPageRuleConditions {
+		return fmt.Errorf("when")
+	}
+	for _, cond := range r.When {
+		if !helpConditionKeyRe.MatchString(cond.Key) || len(cond.Values) == 0 || len(cond.Values) > MaxHelpConditionValues {
+			return fmt.Errorf("when")
+		}
+		for _, v := range cond.Values {
+			if strings.TrimSpace(v) == "" || len(v) > 128 {
+				return fmt.Errorf("when")
+			}
+		}
+	}
 	if len(r.ArticleIDs) > MaxHelpPageRuleArticles {
 		return fmt.Errorf("articles")
 	}
@@ -176,13 +279,14 @@ func (r HelpPageRule) Validate() error {
 	return nil
 }
 
-// MatchPage returns the first rule whose pages match pageURL.
-func (h HelpConfig) MatchPage(pageURL string) (HelpPageRule, bool) {
+// MatchPage returns the first rule whose pages match pageURL and whose
+// conditions, if any, match ctx.
+func (h HelpConfig) MatchPage(pageURL string, ctx HelpPageContext) (HelpPageRule, bool) {
 	if pageURL == "" {
 		return HelpPageRule{}, false
 	}
 	for _, rule := range h.PageRules {
-		if proactive.MatchesURL(rule.Pages, pageURL) {
+		if proactive.MatchesURL(rule.Pages, pageURL) && rule.matches(ctx) {
 			return rule, true
 		}
 	}
@@ -419,6 +523,9 @@ func (c *Config) fillEmptyLists() {
 		}
 		if c.Help.PageRules[i].ArticleIDs == nil {
 			c.Help.PageRules[i].ArticleIDs = []int{}
+		}
+		if c.Help.PageRules[i].When == nil {
+			c.Help.PageRules[i].When = []HelpPageCondition{}
 		}
 	}
 	if c.HomeApps == nil {

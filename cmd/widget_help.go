@@ -59,7 +59,7 @@ func handleWidgetHelp(r *fastglue.Request) error {
 	}
 	// Page rules: the first rule matching the visitor's page picks the articles.
 	// The widget falls back to featured_ids when none of them are available.
-	if rule, ok := config.Help.MatchPage(string(r.RequestCtx.QueryArgs().Peek("page_url"))); ok {
+	if rule, ok := config.Help.MatchPage(string(r.RequestCtx.QueryArgs().Peek("page_url")), livechat.ParseHelpPageContext(string(r.RequestCtx.QueryArgs().Peek("page_context")))); ok {
 		resp["page_rule"] = rule.Name
 		resp["page_article_ids"] = rule.ArticleIDs
 	}

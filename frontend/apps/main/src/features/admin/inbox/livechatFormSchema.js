@@ -268,6 +268,15 @@ export const createFormSchema = (t) =>
                   .transform((items) => items.map((item) => item.trim()).filter(Boolean))
                   .refine((items) => items.length >= 1, t('globals.messages.required'))
                   .refine((items) => items.length <= 20, t('widget.campaignUrlLimit')),
+                when: z
+                  .array(
+                    z.object({
+                      key: z.string().regex(/^[a-z0-9_]{1,64}$/, t('widget.pageRuleWhenKey')),
+                      values: z.array(z.string().trim().min(1).max(128)).min(1).max(20)
+                    })
+                  )
+                  .max(5, t('widget.pageRuleWhenLimit'))
+                  .default([]),
                 article_ids: z.array(z.number().int().positive()).max(10)
               })
             )
