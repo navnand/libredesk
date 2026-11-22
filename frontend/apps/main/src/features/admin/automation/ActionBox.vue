@@ -70,6 +70,15 @@
                   @update:modelValue="(value) => handleNotifyMessageChange(value, index)"
                   class="h-36"
                 />
+                <p class="text-xs text-muted-foreground">
+                  {{ $t('admin.automation.notifyVariablesHint') }}
+                  <code v-pre>{{ .Conversation.ReferenceNumber }}</code>,
+                  <code v-pre>{{ .Conversation.Subject }}</code>,
+                  <code v-pre>{{ .Conversation.LastMessage }}</code>,
+                  <code v-pre>{{ .Contact.FullName }}</code>,
+                  <code v-pre>{{ .Contact.Email }}</code>,
+                  <code v-pre>{{ .Inbox.Name }}</code>
+                </p>
               </div>
 
               <div

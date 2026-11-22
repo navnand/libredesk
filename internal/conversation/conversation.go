@@ -1726,24 +1726,46 @@ func (m *Manager) notifyAutomation(subject, message string, entries []string, co
 		userIDs = userIDs[:amodels.MaxNotifyRecipients]
 	}
 
+	// The subject and message may use template variables, like the
+	// automatic reply does: {{ .Conversation.ReferenceNumber }},
+	// {{ .Contact.Email }}, {{ .Conversation.LastMessage }} and so on.
+	// The email layout escapes the rendered message, so a customer's
+	// text can't add HTML to the agent's email.
 	recipients := m.buildNotificationRecipients(userIDs, func(recipient umodels.User) (string, string, error) {
-		data := template.BuildConversationData(conv, recipient, umodels.User{} /** author **/)
-		data["Message"] = map[string]any{"Content": message}
+		data := notifyTemplateData(conv, recipient)
+		data["Message"] = map[string]any{"Content": m.template.RenderString(data, message)}
 		content, err := m.template.RenderNotificationEmail(automationNotifyEmailContent, data)
-		return subject, content, err
+		return oneLine(m.template.RenderString(data, subject)), content, err
 	})
 
+	general := notifyTemplateData(conv, umodels.User{})
 	if _, err := m.dispatcher.Send(nmodels.Notification{
 		Type:             nmodels.NotificationTypeAutomation,
 		Recipients:       recipients,
-		Title:            subject,
-		Body:             null.StringFrom(message),
+		Title:            oneLine(m.template.RenderString(general, subject)),
+		Body:             null.StringFrom(m.template.RenderString(general, message)),
 		ConversationID:   null.IntFrom(conv.ID),
 		ConversationUUID: conv.UUID,
 	}); err != nil {
 		return fmt.Errorf("sending automation notification: %w", err)
 	}
 	return nil
+}
+
+// notifyTemplateData is the conversation data for a notify action's
+// subject and message, plus the latest message's text.
+func notifyTemplateData(conv models.Conversation, recipient umodels.User) map[string]any {
+	data := template.BuildConversationData(conv, recipient, umodels.User{} /** author **/)
+	if c, ok := data["Conversation"].(map[string]any); ok {
+		c["LastMessage"] = conv.LastMessage.String
+	}
+	return data
+}
+
+// oneLine folds line breaks and runs of spaces, so a rendered value
+// (a customer's subject, say) can't break the email's subject line.
+func oneLine(s string) string {
+	return strings.Join(strings.Fields(s), " ")
 }
 
 func (m *Manager) buildNotificationRecipients(userIDs []int, render func(recipient umodels.User) (subject, content string, err error)) []nmodels.Recipient {

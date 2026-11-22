@@ -97,13 +97,43 @@ func TestAutomationNotifyUsesSystemLayout(t *testing.T) {
 		t.Fatal(err)
 	}
 	agent := umodels.User{ID: 42, FirstName: "Agent", Email: null.StringFrom("agent@example.com"), Enabled: true}
-	conv := models.Conversation{ID: 7, UUID: "conversation-a", ReferenceNumber: "C-7"}
-	subject := "Conversation needs review"
-	for _, message := range []string{
-		"Review this conversation.\nKeep the customer informed.",
-		`Keep <script>alert("test")</script> and {{ .Author.FullName }} as message text.`,
+	conv := models.Conversation{ID: 7, UUID: "conversation-a", ReferenceNumber: "C-7", LastMessage: null.StringFrom("Hi <b>there</b>\nPlease help.")}
+	conv.Contact.Email = null.StringFrom("pat@example.com")
+	for _, tt := range []struct {
+		name, subject, message, wantSubject, wantTitle string
+		want                                           []string
+	}{
+		{
+			name:        "plain text",
+			subject:     "Conversation needs review",
+			message:     "Review this conversation.\nKeep the customer informed.",
+			wantSubject: "Conversation needs review",
+			want:        []string{"Review this conversation.\nKeep the customer informed."},
+		},
+		{
+			name:        "message HTML stays text",
+			subject:     "Conversation needs review",
+			message:     `Keep <script>alert("test")</script> as message text.`,
+			wantSubject: "Conversation needs review",
+			want:        []string{htmltemplate.HTMLEscapeString(`Keep <script>alert("test")</script> as message text.`)},
+		},
+		{
+			name:        "template variables",
+			subject:     "New ticket {{ .Conversation.ReferenceNumber }}\r\nBcc: x@example.com for {{ .Recipient.FirstName }}",
+			message:     "From {{ .Contact.Email }}:\n{{ .Conversation.LastMessage }}",
+			wantSubject: "New ticket C-7 Bcc: x@example.com for Agent",
+			wantTitle:   "New ticket C-7 Bcc: x@example.com for",
+			want:        []string{"From pat@example.com:\nHi &lt;b&gt;there&lt;/b&gt;\nPlease help."},
+		},
+		{
+			name:        "broken template is sent as written",
+			subject:     "Ticket {{ .Conversation.ReferenceNumber",
+			message:     "See {{ .Contact.Email",
+			wantSubject: "Ticket {{ .Conversation.ReferenceNumber",
+			want:        []string{"See {{ .Contact.Email"},
+		},
 	} {
-		t.Run(message, func(t *testing.T) {
+		t.Run(tt.name, func(t *testing.T) {
 			lo := logf.New(logf.Opts{})
 			recorder := &automationEmailRecorder{}
 			m := &Manager{
@@ -115,7 +145,7 @@ func TestAutomationNotifyUsesSystemLayout(t *testing.T) {
 					Prefs:    &replyPreferences{channels: []nmodels.NotificationChannel{nmodels.NotificationChannelEmail}},
 				}),
 			}
-			if err := m.notifyAutomation(subject, message, []string{"user:42"}, conv); err != nil {
+			if err := m.notifyAutomation(tt.subject, tt.message, []string{"user:42"}, conv); err != nil {
 				t.Fatal(err)
 			}
 			if len(recorder.deliveries) != 1 {
@@ -123,22 +153,29 @@ func TestAutomationNotifyUsesSystemLayout(t *testing.T) {
 			}
 			delivery := recorder.deliveries[0]
 			email := delivery.Recipient.Email
-			if email == nil || email.Subject != subject || email.Recipient != agent.Email.String || delivery.Recipient.UserID != agent.ID {
-				t.Fatalf("automation email changed subject or recipient: %+v", delivery)
+			if email == nil || email.Subject != tt.wantSubject || email.Recipient != agent.Email.String || delivery.Recipient.UserID != agent.ID {
+				t.Fatalf("automation email subject or recipient wrong: %+v", delivery)
 			}
-			for _, want := range []string{
-				htmltemplate.HTMLEscapeString(message),
+			wantTitle := tt.wantTitle
+			if wantTitle == "" {
+				wantTitle = tt.wantSubject
+			}
+			if delivery.Notification.Title != wantTitle {
+				t.Errorf("in-app title = %q, want %q", delivery.Notification.Title, wantTitle)
+			}
+			for _, want := range append(tt.want,
 				"<!doctype html>",
 				"</html>",
 				"support.example.com/images/logo.png",
 				"Powered by",
 				"support.example.com/inboxes/all/conversation/conversation-a",
-			} {
+				">#C-7</a>",
+			) {
 				if !strings.Contains(email.Content, want) {
 					t.Errorf("automation email missing %q", want)
 				}
 			}
-			if strings.Contains(email.Content, "Best regards") || strings.Contains(email.Content, "<script>") {
+			if strings.Contains(email.Content, "Best regards") || strings.Contains(email.Content, "<script>") || strings.Contains(email.Content, "<b>") {
 				t.Fatal("automation email added a signature or interpreted message HTML")
 			}
 		})
