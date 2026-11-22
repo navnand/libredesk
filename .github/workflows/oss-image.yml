@@ -15,14 +15,9 @@ permissions:
   contents: read
 
 jobs:
-  # The fork is public: our changes may not name or point to the operator's
-  # companies, people, customers or servers, in code, examples, tests or
-  # commit messages. Only what we added on top of upstream is checked (lines
-  # added since the upstream tag, and our commit messages). The patterns live
-  # in the OSS_DENY_LIST secret (one Perl regex per line), OSS_DENY_ACCEPT holds
-  # fixed strings accepted on purpose. Output names only file:line or the
-  # commit, never a pattern. Without the secret (a fork's pull request) the
-  # check is skipped.
+  # Checks only what this fork adds on top of upstream (added lines and our
+  # commit messages) against a private list in the OSS_DENY_LIST secret.
+  # Reports file:line only. Skipped when the secret isn't available.
   privacy:
     runs-on: ubuntu-latest
     steps:
