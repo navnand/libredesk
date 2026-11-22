@@ -15,6 +15,51 @@ permissions:
   contents: read
 
 jobs:
+  # The fork is public: our changes may not name or point to the operator's
+  # companies, people, customers or servers, in code, examples, tests or
+  # commit messages. Only what we added on top of upstream is checked (lines
+  # added since the upstream tag, and our commit messages). The patterns live
+  # in the OSS_DENY_LIST secret (one Perl regex per line), OSS_DENY_ACCEPT holds
+  # fixed strings accepted on purpose. Output names only file:line or the
+  # commit, never a pattern. Without the secret (a fork's pull request) the
+  # check is skipped.
+  privacy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Our changes name nothing private
+        env:
+          DENY: ${{ secrets.OSS_DENY_LIST }}
+          ACCEPT: ${{ secrets.OSS_DENY_ACCEPT }}
+        run: |
+          if [ -z "$DENY" ]; then
+            echo "::notice::OSS_DENY_LIST isn't available here: check skipped"; exit 0
+          fi
+          git fetch -q --no-tags https://github.com/abhinavxd/libredesk.git "+refs/tags/v*:refs/tags/v*"
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' HEAD)
+          t="$RUNNER_TEMP"
+          printf '%s\n' "$DENY" | grep -vE '^\s*(#|$)' > "$t/deny"
+          printf '%s\n' "$ACCEPT" | grep -vE '^\s*(#|$)' > "$t/accept" || true
+          git diff --no-color -U0 "$base" HEAD \
+            | awk '/^\+\+\+ b\//{f=substr($0,7)} /^@@/{split($3,a,/[+,]/); n=a[2]-1} /^\+[^+]/{n++; print f":"n": "substr($0,2)}' > "$t/added"
+          git diff --name-only --diff-filter=ACR "$base" HEAD | sed 's/$/:1: (file name)/' >> "$t/added"
+          git log --format='%h%n%B' "$base"..HEAD | awk 'NF==1 && /^[0-9a-f]{7,}$/{c=$0; next} !/^Co-Authored-By:/{print "commit "c":0: "$0}' >> "$t/added"
+          : > "$t/hits"
+          while IFS= read -r p; do
+            P="$p" perl -ne 'print if /$ENV{P}/' "$t/added" >> "$t/hits"
+          done < "$t/deny"
+          if [ -s "$t/accept" ]; then grep -vF -f "$t/accept" "$t/hits" > "$t/left" || true; else cp "$t/hits" "$t/left"; fi
+          if [ -s "$t/left" ]; then
+            cut -d: -f1,2 "$t/left" | sort -u | while IFS=: read -r f l; do
+              echo "::error file=$f,line=$l::names or points to something private (ask a maintainer which rule)"
+            done
+            exit 1
+          fi
+          echo "checked $(wc -l < "$t/added") added lines since $base"
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -38,7 +83,7 @@ jobs:
 
   image:
     if: startsWith(github.ref, 'refs/tags/oss/')
-    needs: test
+    needs: [privacy, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
