@@ -856,6 +856,17 @@ func splitConfirmation(answer string) (string, string) {
 	}
 	main := strings.TrimSpace(strings.ReplaceAll(answer[:idx], confirmMarker, ""))
 	confirm := strings.TrimSpace(answer[idx+len(confirmMarker):])
+	// The model sometimes also ends its answer with the confirmation question; send it once.
+	question, _, _ := strings.Cut(confirm, suggestionsMarker)
+	if question = strings.TrimSpace(question); question != "" {
+		head, last := "", main
+		if i := strings.LastIndex(main, "\n"); i != -1 {
+			head, last = main[:i], main[i+1:]
+		}
+		if strings.EqualFold(strings.TrimSpace(last), question) {
+			main = strings.TrimSpace(head)
+		}
+	}
 	if main == "" {
 		return confirm, ""
 	}

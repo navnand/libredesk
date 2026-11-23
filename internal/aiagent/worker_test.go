@@ -28,6 +28,25 @@ func TestSplitSuggestions(t *testing.T) {
 	}
 }
 
+func TestSplitConfirmation(t *testing.T) {
+	cases := []struct {
+		name, in, main, confirm string
+	}{
+		{"plain", "Here is how.\n[[confirm]]\nDid that help?", "Here is how.", "Did that help?"},
+		{"repeated question dropped", "Here is how.\n\nDid that help?\n[[confirm]]\nDid that help?\n[[suggestions]] [\"Yes\",\"No\"]",
+			"Here is how.", "Did that help?\n[[suggestions]] [\"Yes\",\"No\"]"},
+		{"different question kept", "Here is how. Want more?\n[[confirm]]\nDid that help?", "Here is how. Want more?", "Did that help?"},
+		{"only the question", "Did that help?\n[[confirm]]\nDid that help?", "Did that help?", ""},
+		{"no marker", "Here is how.", "Here is how.", ""},
+	}
+	for _, c := range cases {
+		main, confirm := splitConfirmation(c.in)
+		if main != c.main || confirm != c.confirm {
+			t.Errorf("%s: got (%q, %q), want (%q, %q)", c.name, main, confirm, c.main, c.confirm)
+		}
+	}
+}
+
 func TestSplitSuggestionsRejectsInvalidPayload(t *testing.T) {
 	body, suggestions := splitSuggestions("Tell me more\n[[suggestions]] not-json")
 	if body != "Tell me more" || suggestions != nil {
