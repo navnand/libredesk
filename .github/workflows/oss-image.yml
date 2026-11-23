@@ -55,6 +55,33 @@ jobs:
           fi
           echo "checked $(wc -l < "$t/added") added lines since $base"
 
+  # This fork's commits, and the tagger of an oss/* tag, must use a GitHub
+  # no-reply address.
+  authors:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Our commits use a no-reply address
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          git fetch -q --no-tags https://github.com/abhinavxd/libredesk.git "+refs/tags/v*:refs/tags/v*"
+          base=$(git describe --tags --abbrev=0 --match 'v[0-9]*' "$HEAD_SHA")
+          ok='@users\.noreply\.github\.com$'
+          bad=$(git log --format='%h %ae %ce' "$base..$HEAD_SHA" | awk -v ok="$ok" '$2 !~ ok || $3 !~ ok {print $1}')
+          case "$GITHUB_REF" in refs/tags/*)
+            tagger=$(git for-each-ref --format='%(taggeremail:trim)' "$GITHUB_REF")
+            if [ -n "$tagger" ] && ! printf '%s' "$tagger" | grep -qE "$ok"; then bad="$bad ${GITHUB_REF_NAME}"; fi ;;
+          esac
+          if [ -n "$(echo $bad)" ]; then
+            for c in $bad; do echo "::error::$c: author, committer or tagger is not a GitHub no-reply address"; done
+            exit 1
+          fi
+          echo "checked $(git rev-list --count "$base..$HEAD_SHA") commits since $base"
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -78,7 +105,7 @@ jobs:
 
   image:
     if: startsWith(github.ref, 'refs/tags/oss/')
-    needs: [privacy, test]
+    needs: [privacy, authors, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
