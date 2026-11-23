@@ -504,9 +504,32 @@ func (m *Manager) requestHandoffForm(conv cmodels.Conversation, assistant models
 
 // handoffWithNotice tells the customer a person will take over, then hands off. Used when the
 // handoff is automatic rather than the assistant's own reply, so the customer still gets an answer.
+// A live chat inbox's reply expectation message, when set, follows the notice.
 func (m *Manager) handoffWithNotice(conv cmodels.Conversation, assistant models.Assistant, reason string) {
-	_ = m.postReply(conv, assistant, m.i18n.T("ai.agent.handoffNotice"), nil)
+	notice := m.i18n.T("ai.agent.handoffNotice")
+	if expectation := m.replyExpectation(conv); expectation != "" {
+		notice += " " + expectation
+	}
+	_ = m.postReply(conv, assistant, notice, nil)
 	m.handoff(conv, assistant, reason)
+}
+
+// replyExpectation returns the live chat inbox's reply expectation message, or "" for other channels.
+func (m *Manager) replyExpectation(conv cmodels.Conversation) string {
+	if conv.InboxChannel != inbox.ChannelLiveChat {
+		return ""
+	}
+	inboxRecord, err := m.inbox.GetDBRecord(conv.InboxID)
+	if err != nil {
+		m.lo.Error("error loading inbox for AI handoff notice", "inbox_id", conv.InboxID, "error", err)
+		return ""
+	}
+	var config livechat.Config
+	if err := json.Unmarshal(inboxRecord.Config, &config); err != nil {
+		m.lo.Error("error parsing inbox config for AI handoff notice", "inbox_id", conv.InboxID, "error", err)
+		return ""
+	}
+	return strings.TrimSpace(config.ChatReplyExpectationMessage)
 }
 
 // handoff notes the reason and moves the conversation to the fallback team, or unassigns if none is set.
