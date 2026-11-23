@@ -126,20 +126,28 @@ func (m *Manager) sendContinuityEmail(conv models.ContinuityConversation, maxMes
 	}
 
 	// Fetch livechat inbox config for website URL
-	var websiteURL string
+	var websiteURL, brandName string
 	if livechatInbox, err := m.inboxStore.GetDBRecord(conv.InboxID); err == nil {
 		var lcConfig struct {
 			WebsiteURL string `json:"website_url"`
+			BrandName  string `json:"brand_name"`
 		}
 		if err := json.Unmarshal(livechatInbox.Config, &lcConfig); err == nil {
 			websiteURL = lcConfig.WebsiteURL
+			brandName = strings.TrimSpace(lcConfig.BrandName)
 		}
 	}
 
 	// Build email content with all unread messages
 	emailContent := m.buildContinuityEmailContent(unreadMessages, websiteURL)
 
-	emailSubject := m.buildContinuityEmailSubject(conv, unreadMessages[0].TextContent)
+	// A chat has no subject of its own. With a brand name set, the subject names the brand
+	// instead of quoting the first unread message.
+	subjectText := unreadMessages[0].TextContent
+	if brandName != "" {
+		subjectText = m.i18n.Ts("conversation.continuityEmailSubject", "brand", brandName)
+	}
+	emailSubject := m.buildContinuityEmailSubject(conv, subjectText)
 
 	// Generate unique Message-ID for threading
 	sourceID, err := stringutil.GenerateEmailMessageID(conv.UUID, linkedEmailInbox.FromAddress())
