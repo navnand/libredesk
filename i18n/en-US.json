@@ -1850,7 +1850,7 @@
   "widget.pageRuleWhenKey": "Use lower-case letters, numbers and _ for the name before =",
   "widget.pageRuleWhenLimit": "At most 5 conditions per rule",
   "widget.previewContext": "Preview with page context",
-  "widget.previewContextHint": "Optional JSON, as your site sends it, to check rules with conditions, e.g. {\"role\": \"editor\"}.",
+  "widget.previewContextHint": "Optional JSON, as your site sends it, to check rules with conditions, e.g. {'{'}\"role\": \"editor\"{'}'}.",
   "widget.pageRulePagesHint": "One URL or path per line, at least one. Use * to match any characters, e.g. /account/*/settings*. A path matches on any site; start with a host (app.example.com/...) to match only that site.",
   "widget.pageRules": "Page rules",
   "widget.pageRulesHint": "Show different articles on different pages. Rules are checked from top to bottom and the first match wins. If a matching rule has no available articles, the default articles show.",

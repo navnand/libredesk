@@ -168,7 +168,7 @@
   "admin.inbox.livechat.features.fileUpload": "Upload de arquivo",
   "admin.inbox.livechat.features.fileUpload.description": "Permitir que usuários façam upload de arquivos no chat",
   "admin.inbox.livechat.greetingMessage": "Mensagem de saudação",
-  "admin.inbox.livechat.greetingMessage.variables": "Variáveis disponíveis: {'{{.FirstName}}'}, {'{{.LastName}}'}. Utilize {‘|’} para o valor por defeito, por exemplo: Olá {‘{{.FirstName | there}}’}",
+  "admin.inbox.livechat.greetingMessage.variables": "Variáveis disponíveis: {'{{.FirstName}}'}, {'{{.LastName}}'}. Utilize {'|'} para o valor por defeito, por exemplo: Olá {'{{.FirstName | there}}'}",
   "admin.inbox.livechat.homeScreen.fadeBackground": "Desvanecer fundo",
   "admin.inbox.livechat.homeScreen.fadeBackground.description": "Mescle a cor de fundo do cabeçalho na área de conteúdo abaixo",
   "admin.inbox.livechat.homeScreen.headerTextColor.description": "Cor do texto de saudação e introdução na tela inicial",
