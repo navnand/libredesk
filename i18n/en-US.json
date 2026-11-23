@@ -605,6 +605,7 @@
   "ai.agent.handoffError": "The AI assistant could not respond and handed this conversation off to a human.",
   "ai.agent.handoffFormPrompt": "Please share these details before I connect you with a human.",
   "ai.agent.handoffFormUnavailable": "This handoff is no longer pending. Send a new message if you still need a human.",
+  "ai.agent.handoffNotice": "A member of our team will take it from here and reply in this conversation.",
   "ai.agent.handoffMaxTurns": "The AI assistant reached its response limit for this conversation and handed it off to a human.",
   "ai.agent.handoffNoAnswer": "The AI assistant did not have an answer and handed this conversation off to a human.",
   "ai.agent.handoffOtherParticipant": "Someone other than the contact replied on this conversation, so the AI assistant handed it off to a human.",

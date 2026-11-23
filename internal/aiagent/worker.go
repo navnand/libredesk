@@ -181,7 +181,7 @@ func (m *Manager) handoffByConvID(convID int, reason string) {
 		}
 		return
 	}
-	m.handoff(conv, assistant, reason)
+	m.handoffWithNotice(conv, assistant, reason)
 }
 
 func (m *Manager) markDone(convID int) {
@@ -258,11 +258,11 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	var turns int
 	if err := m.q.CountAITurns.Get(&turns, conv.ID, assistant.UserID); err != nil {
 		m.lo.Error("error counting ai turns", "conversation_id", conv.ID, "error", err)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffError"))
 		return
 	}
 	if turns >= assistant.MaxTurns {
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffMaxTurns"))
+		m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffMaxTurns"))
 		return
 	}
 
@@ -350,7 +350,8 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		if outcome.handedOff {
 			reason = outcome.handoffReason
 		}
-		m.handoff(conv, assistant, reason)
+		// The run failed, so the customer has seen no reply from it.
+		m.handoffWithNotice(conv, assistant, reason)
 		return
 	}
 	// The model's text answer is the reply to the customer. Handoff and resolve are separate tool actions.
@@ -366,7 +367,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	if answer != "" {
 		m.lo.Debug("ai agent replying", "conversation_uuid", conv.UUID, "reply_len", len(answer), "resolved", outcome.resolved)
 		if err := m.postReply(conv, assistant, answer, replyMeta(answerSuggestions, articleIDs)); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffError"))
 			return
 		}
 	}
@@ -377,7 +378,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 		meta := suggestedRepliesMeta(confirmSuggestions)
 		meta["is_confirmation"] = true
 		if err := m.postReply(conv, assistant, confirm, meta); err != nil {
-			m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+			m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffError"))
 			return
 		}
 	}
@@ -395,7 +396,7 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	}
 	if answer == "" {
 		m.lo.Debug("ai agent no answer, handing off", "conversation_uuid", conv.UUID)
-		m.handoff(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
+		m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffNoAnswer"))
 	}
 }
 
@@ -499,6 +500,13 @@ func (m *Manager) requestHandoffForm(conv cmodels.Conversation, assistant models
 		return false
 	}
 	return true
+}
+
+// handoffWithNotice tells the customer a person will take over, then hands off. Used when the
+// handoff is automatic rather than the assistant's own reply, so the customer still gets an answer.
+func (m *Manager) handoffWithNotice(conv cmodels.Conversation, assistant models.Assistant, reason string) {
+	_ = m.postReply(conv, assistant, m.i18n.T("ai.agent.handoffNotice"), nil)
+	m.handoff(conv, assistant, reason)
 }
 
 // handoff notes the reason and moves the conversation to the fallback team, or unassigns if none is set.
