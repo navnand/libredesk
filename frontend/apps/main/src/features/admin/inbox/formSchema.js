@@ -3,6 +3,13 @@ import { isGoDuration, validateEmail, isValidTemplate } from '@shared-ui/utils/s
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@main/constants/auth.js'
 import { extractEmailAddress } from '@main/utils/email-sender'
 
+// Splits a comma- or space-separated list of addresses into lowercased addresses.
+export const parseAddressList = (value) =>
+  String(value || '')
+    .split(/[\s,;]+/)
+    .map((a) => a.trim().toLowerCase())
+    .filter(Boolean)
+
 export const FROM_NAME_TEMPLATE_VARS = ['.Agent.FirstName', '.Agent.LastName', '.Agent.FullName', '.Inbox.Name']
 
 export const createFormSchema = (t) => z.object({
@@ -29,6 +36,12 @@ export const createFormSchema = (t) => z.object({
   csat_enabled: z.boolean().optional(),
   prompt_tags_on_reply: z.boolean().optional(),
   enable_plus_addressing: z.boolean().optional(),
+  reply_to_senders: z
+    .string()
+    .optional()
+    .refine((v) => parseAddressList(v).every(validateEmail), {
+      message: t('validation.invalidEmail')
+    }),
   auth_type: z.enum([AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2]),
   oauth: z.object({
     access_token: z.string().optional(),

@@ -427,6 +427,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			SMTP                 []map[string]any  `json:"smtp"`
 			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			ReplyToSenders       []string          `json:"reply_to_senders"`
 		}
 		var updateCfg struct {
 			AuthType             string            `json:"auth_type"`
@@ -435,6 +436,7 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			SMTP                 []map[string]any  `json:"smtp"`
 			ReplyTo              string            `json:"reply_to"`
 			EnablePlusAddressing bool              `json:"enable_plus_addressing"`
+			ReplyToSenders       []string          `json:"reply_to_senders"`
 		}
 
 		if err := json.Unmarshal(current.Config, &currentCfg); err != nil {
@@ -469,6 +471,11 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 			if updateCfg.SMTP[i]["password"] == "" && i < len(currentCfg.SMTP) {
 				updateCfg.SMTP[i]["password"] = currentCfg.SMTP[i]["password"]
 			}
+		}
+
+		// Keep the saved reply-to senders when the update leaves the key out.
+		if updateCfg.ReplyToSenders == nil {
+			updateCfg.ReplyToSenders = currentCfg.ReplyToSenders
 		}
 
 		// Preserve existing OAuth fields if update has empty

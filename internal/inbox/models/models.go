@@ -92,6 +92,7 @@ type Config struct {
 	FromNameTemplate     string       `json:"from_name_template"`
 	ReplyTo              string       `json:"reply_to"`
 	EnablePlusAddressing bool         `json:"enable_plus_addressing"`
+	ReplyToSenders       []string     `json:"reply_to_senders"` // Senders whose mail is filed under its Reply-To address
 }
 
 // OAuthConfig holds OAuth 2.0 authentication details.

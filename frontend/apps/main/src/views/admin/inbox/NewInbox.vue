@@ -60,6 +60,7 @@ import WhatsAppIcon from '@main/components/icons/WhatsAppIcon.vue'
 import MenuCard from '@main/components/layout/MenuCard.vue'
 import FormGrid from '@shared-ui/components/FormGrid.vue'
 import EmailInboxForm from '@/features/admin/inbox/EmailInboxForm.vue'
+import { parseAddressList } from '@/features/admin/inbox/formSchema.js'
 import LivechatInboxForm from '@/features/admin/inbox/LivechatInboxForm.vue'
 import WhatsAppInboxForm from '@/features/admin/inbox/WhatsAppInboxForm.vue'
 import api from '@/api'
@@ -147,6 +148,7 @@ const submitForm = (values) => {
     config: {
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
+      reply_to_senders: parseAddressList(values.reply_to_senders),
       imap: [values.imap],
       smtp: [values.smtp]
     }

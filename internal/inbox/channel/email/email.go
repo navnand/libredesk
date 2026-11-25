@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -45,6 +46,7 @@ type Email struct {
 	fromNameTemplate          string
 	replyTo                   string
 	enablePlusAddressing      bool
+	replyToSenders            map[string]struct{}
 	messageStore              inbox.MessageStore
 	userStore                 inbox.UserStore
 	wg                        sync.WaitGroup
@@ -128,6 +130,7 @@ func New(store inbox.MessageStore, userStore inbox.UserStore, opts Opts) (*Email
 		oauth:                     opts.Config.OAuth,
 		authType:                  opts.Config.AuthType,
 		enablePlusAddressing:      opts.Config.EnablePlusAddressing,
+		replyToSenders:            addressSet(opts.Config.ReplyToSenders),
 		tokenRefreshCallback:      opts.TokenRefreshCallback,
 		aliasVerificationCallback: opts.AliasVerificationCallback,
 		aliasExpiryCallback:       opts.AliasExpiryCallback,
@@ -230,6 +233,7 @@ func (e *Email) getCurrentConfig() models.Config {
 		OAuth:                oauth,
 		AuthType:             e.authType,
 		EnablePlusAddressing: e.enablePlusAddressing,
+		ReplyToSenders:       e.replyToSenderList(),
 	}
 }
 
@@ -356,4 +360,25 @@ func RefreshOAuthConfig(currentToken *models.OAuthConfig) (*models.OAuthConfig, 
 	}
 
 	return newOAuthConfig, nil
+}
+
+// addressSet returns the lowercased, trimmed addresses as a set.
+func addressSet(addrs []string) map[string]struct{} {
+	set := make(map[string]struct{}, len(addrs))
+	for _, a := range addrs {
+		if a = strings.ToLower(strings.TrimSpace(a)); a != "" {
+			set[a] = struct{}{}
+		}
+	}
+	return set
+}
+
+// replyToSenderList returns the reply-to senders, sorted.
+func (e *Email) replyToSenderList() []string {
+	out := make([]string, 0, len(e.replyToSenders))
+	for a := range e.replyToSenders {
+		out = append(out, a)
+	}
+	sort.Strings(out)
+	return out
 }

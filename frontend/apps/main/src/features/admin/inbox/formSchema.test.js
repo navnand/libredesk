@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, test, expect } from 'vitest'
-import { createFormSchema } from './formSchema'
+import { createFormSchema, parseAddressList } from './formSchema'
 
 const mockT = (key, params) => `${key} ${JSON.stringify(params || {})}`
 const schema = createFormSchema(mockT)
@@ -276,5 +276,21 @@ describe('Email Inbox Form Schema', () => {
 
     test('empty object', () => {
         expect(() => schema.parse({})).toThrow()
+    })
+})
+
+describe('reply_to_senders', () => {
+    test('empty accepted', () => {
+        expect(() => schema.parse({ ...validForm, reply_to_senders: '' })).not.toThrow()
+    })
+    test('list of addresses accepted', () => {
+        expect(() => schema.parse({ ...validForm, reply_to_senders: 'forms@example.com, Relay@Example.com' })).not.toThrow()
+    })
+    test('invalid address rejected', () => {
+        expect(() => schema.parse({ ...validForm, reply_to_senders: 'forms@example.com, relay@' })).toThrow()
+    })
+    test('parseAddressList splits and lowercases', () => {
+        expect(parseAddressList(' Forms@Example.com,relay@example.com ;  ')).toEqual(['forms@example.com', 'relay@example.com'])
+        expect(parseAddressList('')).toEqual([])
     })
 })

@@ -53,6 +53,7 @@ import LoadingOverlay from '@main/components/layout/LoadingOverlay.vue'
 import AdminToolbar from '@main/layouts/admin/AdminToolbar.vue'
 import { EMITTER_EVENTS } from '@/constants/emitterEvents.js'
 import { AUTH_TYPE_PASSWORD, AUTH_TYPE_OAUTH2 } from '@/constants/auth.js'
+import { parseAddressList } from '@/features/admin/inbox/formSchema.js'
 import { useEmitter } from '@/composables/useEmitter'
 import { handleHTTPError } from '@shared-ui/utils/http.js'
 import { useI18n } from 'vue-i18n'
@@ -81,6 +82,7 @@ const submitForm = (values) => {
       auth_type: values.auth_type,
       reply_to: values.reply_to,
       enable_plus_addressing: values.enable_plus_addressing,
+      reply_to_senders: parseAddressList(values.reply_to_senders),
       imap: [{ ...values.imap }],
       smtp: [{ ...values.smtp }]
     }
@@ -249,6 +251,7 @@ onMounted(async () => {
     inboxData.oauth = inboxData?.config?.oauth || {}
     inboxData.enable_plus_addressing = inboxData?.config?.enable_plus_addressing || false
     inboxData.reply_to = inboxData?.config?.reply_to || ''
+    inboxData.reply_to_senders = (inboxData?.config?.reply_to_senders || []).join(', ')
     inboxData.aliases = inboxData?.aliases || []
     inbox.value = inboxData
     setAliasVerificationState(inboxData.aliases)

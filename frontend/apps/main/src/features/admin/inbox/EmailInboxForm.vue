@@ -711,6 +711,24 @@
                 </FormItem>
               </FormField>
             </div>
+            <FormField v-slot="{ componentField, handleChange, meta }" name="reply_to_senders">
+              <FormItem>
+                <FormLabel>{{ $t('admin.inbox.replyToSenders') }}</FormLabel>
+                <FormControl>
+                  <Input
+                    type="text"
+                    :placeholder="t('admin.inbox.replyToSenders.placeholder')"
+                    :name="componentField.name"
+                    :model-value="componentField.modelValue"
+                    @update:model-value="(v) => handleChange(v, meta.validated)"
+                  />
+                </FormControl>
+                <FormDescription>
+                  {{ $t('admin.inbox.replyToSenders.description') }}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            </FormField>
             <FormField
               v-slot="{ componentField, handleChange, meta }"
               name="enable_plus_addressing"
@@ -1077,6 +1095,7 @@ const form = useForm({
     aliases: [],
     from_name_template: '',
     reply_to: '',
+    reply_to_senders: '',
     enabled: true,
     csat_enabled: false,
     prompt_tags_on_reply: false,
@@ -1159,6 +1178,7 @@ const getFieldSection = (key) => {
     [
       'from_name_template',
       'reply_to',
+      'reply_to_senders',
       'enable_plus_addressing',
       'csat_enabled',
       'prompt_tags_on_reply'

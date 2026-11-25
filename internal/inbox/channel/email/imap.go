@@ -414,23 +414,29 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		return nil
 	}
 
+	contactAddr := e.contactAddress(env)
+	contactEmail := strings.ToLower(contactAddr.Addr())
+	if contactEmail != fromAddress {
+		e.lo.Debug("filing message under its reply-to address", "from", fromAddress, "contact", contactEmail)
+	}
+
 	// Check if any contact with this email is blocked, if so, ignore the message.
-	if blocked, err := e.userStore.IsEmailBlocked(fromAddress); err != nil {
-		e.lo.Error("error checking if email is blocked", "email", fromAddress, "error", err)
+	if blocked, err := e.userStore.IsEmailBlocked(contactEmail); err != nil {
+		e.lo.Error("error checking if email is blocked", "email", contactEmail, "error", err)
 		return fmt.Errorf("checking if email is blocked: %w", err)
 	} else if blocked {
-		e.lo.Info("contact email is blocked dropping incoming email", "email", fromAddress)
+		e.lo.Info("contact email is blocked dropping incoming email", "email", contactEmail)
 		return nil
 	}
 
 	e.lo.Debug("processing new incoming message", "message_id", messageID, "subject", env.Subject, "from", fromAddress, "inbox_id", inboxID)
 
 	// Make contact.
-	firstName, lastName := getContactName(env.From[0])
+	firstName, lastName := getContactName(contactAddr)
 	contact := models.IncomingContact{
 		FirstName: firstName,
 		LastName:  lastName,
-		Email:     null.StringFrom(fromAddress),
+		Email:     null.StringFrom(contactEmail),
 	}
 
 	// Lowercase and set the `to`, `cc`, `from` and `bcc` addresses in message meta.
@@ -648,6 +654,20 @@ func partToAttachment(part *enmime.Part, disposition string) attachment.Attachme
 		Size:        len(part.Content),
 		Disposition: disposition,
 	}
+}
+
+// contactAddress returns the Reply-To address for mail from a listed reply-to sender, else the From address.
+func (e *Email) contactAddress(env *imap.Envelope) imap.Address {
+	from := env.From[0]
+	if _, ok := e.replyToSenders[strings.ToLower(from.Addr())]; !ok {
+		return from
+	}
+	for _, rt := range env.ReplyTo {
+		if rt.Addr() != "" && !strings.EqualFold(rt.Addr(), from.Addr()) {
+			return rt
+		}
+	}
+	return from
 }
 
 // getContactName extracts the contact's first and last name from the IMAP address.
