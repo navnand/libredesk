@@ -3,7 +3,18 @@ package aiagent
 import (
 	"strings"
 	"testing"
+
+	"github.com/abhinavxd/libredesk/internal/aiagent/models"
 )
+
+func TestBuildSystemPromptPronounRule(t *testing.T) {
+	for _, handoff := range []bool{true, false} {
+		got := buildSystemPrompt(models.Assistant{Name: "Helper", HandoffEnabled: handoff})
+		if !strings.Contains(got, "Do not assume anyone's gender from their name.") {
+			t.Errorf("handoff=%v: prompt is missing the pronoun rule", handoff)
+		}
+	}
+}
 
 func TestNeutralizeMarkers(t *testing.T) {
 	// Content without the doubled-angle tokens must pass through untouched.
