@@ -131,7 +131,14 @@ type HelpConfig struct {
 	Users        HelpAudience   `json:"users"`
 	FeaturedIDs  []int          `json:"featured_ids"`
 	PageRules    []HelpPageRule `json:"page_rules"`
+	// AIHelpCenterIDs lists the help centers AI assistants search in this inbox; empty means all.
+	AIHelpCenterIDs []int `json:"ai_help_center_ids,omitempty"`
+	// AIPrivate hides this inbox's help center from AI assistants in other inboxes.
+	AIPrivate bool `json:"ai_private,omitempty"`
 }
+
+// MaxAIHelpCenters caps the help centers listed for AI assistants.
+const MaxAIHelpCenters = 50
 
 // Limits for page rules, mirrored in the admin form schema.
 const (

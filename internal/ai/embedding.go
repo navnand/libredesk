@@ -91,8 +91,8 @@ func (ix *embeddingIndex) chunksBySourceID(sourceType string) map[int]indexedChu
 	return out
 }
 
-// search returns the top-k matches within the given source types and the count of chunks skipped for mismatched vector dimensions.
-func (ix *embeddingIndex) search(query []float32, k int, sourceTypes ...string) ([]models.SearchResult, int) {
+// search returns the top-k matches within the given source types that keep accepts (nil accepts all), and the count of chunks skipped for mismatched vector dimensions.
+func (ix *embeddingIndex) search(query []float32, k int, keep func(models.SearchResult) bool, sourceTypes ...string) ([]models.SearchResult, int) {
 	ix.mu.RLock()
 	defer ix.mu.RUnlock()
 
@@ -115,12 +115,16 @@ func (ix *embeddingIndex) search(query []float32, k int, sourceTypes ...string) 
 			continue
 		}
 		score := dot(query, c.vec) / (qNorm * c.norm)
-		results = append(results, models.SearchResult{
+		r := models.SearchResult{
 			SourceType: c.sourceType,
 			SourceID:   c.sourceID,
 			ChunkText:  c.chunkText,
 			Score:      float64(score),
-		})
+		}
+		if keep != nil && !keep(r) {
+			continue
+		}
+		results = append(results, r)
 	}
 
 	sort.Slice(results, func(i, j int) bool { return results[i].Score > results[j].Score })
@@ -132,10 +136,15 @@ func (ix *embeddingIndex) search(query []float32, k int, sourceTypes ...string) 
 
 // Search embeds the query and returns the top-k most similar knowledge chunks across snippets and help articles.
 func (m *Manager) Search(ctx context.Context, query string, k int) ([]models.SearchResult, error) {
-	return m.searchSources(ctx, query, k, models.SourceSnippet, models.SourceHelpArticle)
+	return m.searchSources(ctx, query, k, nil, models.SourceSnippet, models.SourceHelpArticle)
 }
 
-func (m *Manager) searchSources(ctx context.Context, query string, k int, sourceTypes ...string) ([]models.SearchResult, error) {
+// SearchWhere is Search limited to the results keep accepts; a nil keep accepts all.
+func (m *Manager) SearchWhere(ctx context.Context, query string, k int, keep func(models.SearchResult) bool) ([]models.SearchResult, error) {
+	return m.searchSources(ctx, query, k, keep, models.SourceSnippet, models.SourceHelpArticle)
+}
+
+func (m *Manager) searchSources(ctx context.Context, query string, k int, keep func(models.SearchResult) bool, sourceTypes ...string) ([]models.SearchResult, error) {
 	// A run arriving right after boot must not search the index before it has loaded.
 	select {
 	case <-m.indexReady:
@@ -146,7 +155,7 @@ func (m *Manager) searchSources(ctx context.Context, query string, k int, source
 	if err != nil {
 		return nil, err
 	}
-	results, dimMismatch := m.index.search(qvec, k, sourceTypes...)
+	results, dimMismatch := m.index.search(qvec, k, keep, sourceTypes...)
 	if dimMismatch > 0 {
 		m.lo.Warn("skipped stale embeddings with mismatched dimensions; reindex after changing the embedding model", "source_types", sourceTypes, "count", dimMismatch, "query_dimensions", len(qvec))
 	}

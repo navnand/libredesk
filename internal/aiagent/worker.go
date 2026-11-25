@@ -286,10 +286,16 @@ func (m *Manager) handle(ctx context.Context, convID int) {
 	runVerified := verified()
 	m.lo.Debug("ai agent verification state", "conversation_uuid", conv.UUID, "channel", conv.InboxChannel, "contact_type", conv.Contact.Type, "has_email", conv.Contact.Email.String != "", "verified", runVerified)
 
+	keep, err := m.knowledgeFilter(conv.InboxID)
+	if err != nil {
+		m.lo.Error("error loading assistant knowledge scope", "conversation_id", conv.ID, "error", err)
+		m.handoffWithNotice(conv, assistant, m.i18n.T("ai.agent.handoffError"))
+		return
+	}
 	outcome := &runOutcome{}
 	var hits []aimodels.SearchResult
 	tools := []ai.Tool{
-		&searchKnowledgeTool{m: m, citationsEnabled: assistant.CitationsEnabled, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }},
+		&searchKnowledgeTool{m: m, citationsEnabled: assistant.CitationsEnabled, keep: keep, collect: func(rs []aimodels.SearchResult) { hits = append(hits, rs...) }},
 		&resolveTool{m: m, conv: conv, outcome: outcome},
 	}
 	if assistant.HandoffEnabled {

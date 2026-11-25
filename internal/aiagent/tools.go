@@ -72,6 +72,7 @@ type runOutcome struct {
 type searchKnowledgeTool struct {
 	m                *Manager
 	collect          func([]aimodels.SearchResult)
+	keep             func(aimodels.SearchResult) bool
 	citationsEnabled bool
 }
 
@@ -93,7 +94,7 @@ func (t *searchKnowledgeTool) Execute(ctx context.Context, args string) (string,
 	if strings.TrimSpace(in.Query) == "" {
 		return "No query provided.", nil
 	}
-	results, err := t.m.ai.Search(ctx, in.Query, searchResultLimit)
+	results, err := t.m.ai.SearchWhere(ctx, in.Query, searchResultLimit, t.keep)
 	if err != nil {
 		return "", err
 	}

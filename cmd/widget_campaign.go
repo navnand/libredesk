@@ -249,8 +249,13 @@ func validateWidgetFeatures(app *App, config livechat.Config) error {
 	if config.Help.HelpCenterID < 0 || len(config.Help.FeaturedIDs) > 10 || len(config.Campaigns) > 50 {
 		return campaignInputError(app)
 	}
-	if len(config.Help.PageRules) > livechat.MaxHelpPageRules {
+	if len(config.Help.PageRules) > livechat.MaxHelpPageRules || len(config.Help.AIHelpCenterIDs) > livechat.MaxAIHelpCenters {
 		return campaignInputError(app)
+	}
+	for _, id := range config.Help.AIHelpCenterIDs {
+		if id <= 0 {
+			return campaignInputError(app)
+		}
 	}
 	ruleIDs := make(map[string]bool)
 	for _, rule := range config.Help.PageRules {

@@ -123,8 +123,40 @@ describe('Livechat Inbox Form Schema', () => {
       visitors: { tab: true },
       users: { tab: false },
       featured_ids: [13, 8, 21],
-      page_rules: []
+      page_rules: [],
+      ai_help_center_ids: [],
+      ai_private: false
     })
+  })
+
+  test('help keeps the AI assistant help centers and private switch', () => {
+    const parsed = schema.parse(
+      withConfig({
+        help: {
+          help_center_id: 4,
+          visitors: { tab: true },
+          users: { tab: true },
+          featured_ids: [],
+          ai_help_center_ids: [4, 3],
+          ai_private: true
+        }
+      })
+    )
+    expect(parsed.config.help.ai_help_center_ids).toEqual([4, 3])
+    expect(parsed.config.help.ai_private).toBe(true)
+    expect(() =>
+      schema.parse(
+        withConfig({
+          help: {
+            help_center_id: 4,
+            visitors: { tab: true },
+            users: { tab: true },
+            featured_ids: [],
+            ai_help_center_ids: [0]
+          }
+        })
+      )
+    ).toThrow()
   })
 
   test('page rules keep their order and drop blank page lines', () => {

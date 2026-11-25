@@ -6,6 +6,7 @@ import { Label } from '@shared-ui/components/ui/label'
 import { Button } from '@shared-ui/components/ui/button'
 import { Input } from '@shared-ui/components/ui/input'
 import { Textarea } from '@shared-ui/components/ui/textarea'
+import { Checkbox } from '@shared-ui/components/ui/checkbox'
 import {
   Select,
   SelectTrigger,
@@ -54,6 +55,13 @@ const selectHelpCenter = (value) =>
     featured_ids: [],
     page_rules: (props.modelValue.page_rules || []).map((rule) => ({ ...rule, article_ids: [] }))
   })
+
+const aiListed = computed(() => props.modelValue.ai_help_center_ids || [])
+const toggleAIHelpCenter = (id, checked) =>
+  update(
+    'ai_help_center_ids',
+    checked ? [...aiListed.value.filter((x) => x !== id), id] : aiListed.value.filter((x) => x !== id)
+  )
 
 // Page rules: checked top to bottom, first match wins.
 const rules = computed(() => props.modelValue.page_rules || [])
@@ -137,6 +145,31 @@ const articleCount = (rule) => (rule.article_ids || []).length
     <p v-if="failed" role="alert" class="text-sm text-destructive">
       {{ t('globals.messages.helpLoadError') }}
     </p>
+
+    <div data-ai-help-centers class="space-y-4">
+      <h4 class="ui-heading">{{ t('widget.aiHelpCenters') }}</h4>
+      <p class="ui-description">{{ t('widget.aiHelpCentersHint') }}</p>
+      <div class="space-y-2">
+        <label
+          v-for="center in centers"
+          :key="center.id"
+          class="flex items-center gap-2 text-sm text-foreground"
+        >
+          <Checkbox
+            :checked="aiListed.includes(center.id)"
+            @update:checked="toggleAIHelpCenter(center.id, $event)"
+          />
+          {{ center.name }}
+        </label>
+      </div>
+      <SwitchField
+        v-if="modelValue.help_center_id"
+        :title="t('widget.aiPrivate')"
+        :description="t('widget.aiPrivateHint')"
+        :checked="modelValue.ai_private"
+        @update:checked="update('ai_private', $event)"
+      />
+    </div>
 
     <template v-if="modelValue.help_center_id">
       <div class="space-y-4">

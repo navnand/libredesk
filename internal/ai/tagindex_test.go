@@ -40,7 +40,7 @@ func TestIndexSearchFiltersBySourceType(t *testing.T) {
 		{sourceType: models.SourceTag, sourceID: 2, chunkText: "tag", vec: []float32{1, 0}, norm: 1},
 	})
 
-	results, _ := ix.search([]float32{1, 0}, 10, models.SourceTag)
+	results, _ := ix.search([]float32{1, 0}, 10, nil, models.SourceTag)
 	if len(results) != 1 || results[0].ChunkText != "tag" {
 		t.Fatalf("results = %v, want only the tag chunk", results)
 	}

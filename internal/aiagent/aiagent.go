@@ -51,6 +51,8 @@ type queries struct {
 	GetAssistantWindowStats *sqlx.Stmt `query:"get-assistant-window-stats"`
 	GetAssistantExpectation *sqlx.Stmt `query:"get-assistant-expectation-by-user-id"`
 	InsertAIAgentEvent      *sqlx.Stmt `query:"insert-ai-agent-event"`
+	GetInboxAIHelpScopes    *sqlx.Stmt `query:"get-inbox-ai-help-scopes"`
+	GetHelpArticleCenters   *sqlx.Stmt `query:"get-help-article-centers"`
 
 	InsertFAQSuggestion           *sqlx.Stmt `query:"insert-faq-suggestion"`
 	CountFAQByConversation        *sqlx.Stmt `query:"count-faq-suggestions-by-conversation"`

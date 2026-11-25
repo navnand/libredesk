@@ -114,7 +114,9 @@ export const defaultWidgetHelp = () => ({
   visitors: { tab: true },
   users: { tab: true },
   featured_ids: [],
-  page_rules: []
+  page_rules: [],
+  ai_help_center_ids: [],
+  ai_private: false
 })
 export const createWidgetConditionsSchema = (t) =>
   z.object({
@@ -281,7 +283,9 @@ export const createFormSchema = (t) =>
               })
             )
             .max(100)
-            .default([])
+            .default([]),
+          ai_help_center_ids: z.array(z.number().int().positive()).max(50).default([]),
+          ai_private: z.boolean().default(false)
         })
         .default(defaultWidgetHelp),
       brand_name: z.string().min(1, { message: t('globals.messages.required') }),

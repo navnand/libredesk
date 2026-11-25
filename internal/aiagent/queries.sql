@@ -143,3 +143,16 @@ WHERE id = $1 AND status = 'approved';
 -- name: approve-faq-suggestion-if-pending
 UPDATE ai_faq_suggestions SET status = 'approved', reviewed_by_id = $2, reviewed_at = now(), updated_at = now()
 WHERE id = $1 AND status = 'pending';
+
+-- name: get-inbox-ai-help-scopes
+SELECT id,
+       CASE WHEN jsonb_typeof(config->'help'->'help_center_id') = 'number' THEN (config->'help'->>'help_center_id')::int ELSE 0 END AS help_center_id,
+       CASE WHEN jsonb_typeof(config->'help'->'ai_help_center_ids') = 'array' THEN config->'help'->'ai_help_center_ids' ELSE '[]'::jsonb END AS ai_help_center_ids,
+       COALESCE(jsonb_typeof(config->'help'->'ai_private') = 'boolean' AND (config->'help'->>'ai_private')::boolean, false) AS ai_private
+FROM inboxes
+WHERE deleted_at IS NULL AND channel = 'livechat';
+
+-- name: get-help-article-centers
+SELECT a.id, c.help_center_id
+FROM help_articles a
+JOIN article_collections c ON c.id = a.collection_id;

@@ -497,6 +497,11 @@ func (m *Manager) Update(id int, inbox imodels.Inbox) (imodels.Inbox, error) {
 		}
 		inbox.Config = updatedConfig
 	case "livechat":
+		merged, err := keepLivechatAIHelp(current.Config, inbox.Config)
+		if err != nil {
+			return imodels.Inbox{}, envelope.NewError(envelope.InputError, m.i18n.T("globals.messages.badRequest"), nil)
+		}
+		inbox.Config = merged
 		// Preserve existing secret if update contains password dummy
 		if inbox.Secret.Valid && strings.Contains(inbox.Secret.String, stringutil.PasswordDummy) {
 			inbox.Secret = current.Secret
@@ -1039,4 +1044,50 @@ func emailSendingConfigChanged(current, updated imodels.Config) bool {
 	a, b := current.OAuth, updated.OAuth
 	return a.Provider != b.Provider || a.ClientID != b.ClientID || a.ClientSecret != b.ClientSecret ||
 		a.TenantID != b.TenantID || a.RefreshToken != b.RefreshToken
+}
+
+// aiHelpKeys are the help config keys kept from the saved config when an update leaves them out.
+var aiHelpKeys = []string{"ai_help_center_ids", "ai_private"}
+
+// keepLivechatAIHelp copies saved help.ai_* keys into update when update's help object leaves them out.
+func keepLivechatAIHelp(current, update json.RawMessage) (json.RawMessage, error) {
+	var cur, upd map[string]json.RawMessage
+	if len(update) == 0 || len(current) == 0 || json.Unmarshal(current, &cur) != nil {
+		return update, nil
+	}
+	var curHelp map[string]json.RawMessage
+	if json.Unmarshal(cur["help"], &curHelp) != nil || curHelp == nil {
+		return update, nil
+	}
+	if err := json.Unmarshal(update, &upd); err != nil {
+		return nil, err
+	}
+	if upd == nil {
+		return update, nil
+	}
+	updHelp := map[string]json.RawMessage{}
+	if raw, ok := upd["help"]; ok && string(raw) != "null" {
+		if err := json.Unmarshal(raw, &updHelp); err != nil {
+			return nil, err
+		}
+	}
+	changed := false
+	for _, k := range aiHelpKeys {
+		if _, ok := updHelp[k]; ok {
+			continue
+		}
+		if v, ok := curHelp[k]; ok {
+			updHelp[k] = v
+			changed = true
+		}
+	}
+	if !changed {
+		return update, nil
+	}
+	help, err := json.Marshal(updHelp)
+	if err != nil {
+		return nil, err
+	}
+	upd["help"] = help
+	return json.Marshal(upd)
 }
