@@ -172,3 +172,24 @@ describe('computeRecipientsFromMessage', () => {
         })
     })
 })
+
+describe('computeRecipientsFromMessage with reply-to', () => {
+    test('replies to the reply-to address, not the sender', () => {
+        const message = {
+            type: 'incoming',
+            meta: { from: ['forms@example.com'], reply_to: ['jane@acme.test'], to: ['support@example.com'], cc: [] }
+        }
+        const result = computeRecipientsFromMessage(message, 'jane@acme.test', ['support@example.com'])
+        expect(result.to).toEqual(['jane@acme.test'])
+        expect(result.cc).toEqual([])
+    })
+
+    test('without reply-to keeps replying to the sender', () => {
+        const message = {
+            type: 'incoming',
+            meta: { from: ['jane@acme.test'], to: ['support@example.com'], cc: [] }
+        }
+        const result = computeRecipientsFromMessage(message, 'jane@acme.test', ['support@example.com'])
+        expect(result.to).toEqual(['jane@acme.test'])
+    })
+})

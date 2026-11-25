@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"mime"
+	"slices"
 	"strings"
 	"time"
 
@@ -465,13 +466,17 @@ func (e *Email) processEnvelope(ctx context.Context, client *imapclient.Client, 
 		}
 	}
 
-	meta, err := json.Marshal(map[string]any{
+	metaMap := map[string]any{
 		"from":    fromAddr,
 		"cc":      ccAddr,
 		"bcc":     bccAddr,
 		"to":      toAddr,
 		"subject": stringutil.SanitizeUTF8(env.Subject),
-	})
+	}
+	if replyTo := replyToAddresses(env); len(replyTo) > 0 {
+		metaMap["reply_to"] = replyTo
+	}
+	meta, err := json.Marshal(metaMap)
 	if err != nil {
 		e.lo.Error("error marshalling meta", "error", err)
 		return fmt.Errorf("marshalling meta: %w", err)
@@ -654,6 +659,22 @@ func partToAttachment(part *enmime.Part, disposition string) attachment.Attachme
 		Size:        len(part.Content),
 		Disposition: disposition,
 	}
+}
+
+// replyToAddresses returns the envelope's lowercased Reply-To addresses that differ from its From addresses.
+func replyToAddresses(env *imap.Envelope) []string {
+	from := make(map[string]bool, len(env.From))
+	for _, f := range env.From {
+		from[strings.ToLower(f.Addr())] = true
+	}
+	var out []string
+	for _, rt := range env.ReplyTo {
+		a := strings.ToLower(rt.Addr())
+		if a != "" && !from[a] && !slices.Contains(out, a) {
+			out = append(out, a)
+		}
+	}
+	return out
 }
 
 // contactAddress returns the Reply-To address for mail from a listed reply-to sender, else the From address.

@@ -12,11 +12,13 @@ export function computeRecipientsFromMessage (message, contactEmail, ownedAddres
 
     // Build TO field
     const toList = isIncoming
-        ? meta.from && meta.from.length
-            ? meta.from
-            : contactEmail
-                ? [contactEmail]
-                : []
+        ? meta.reply_to && meta.reply_to.length
+            ? meta.reply_to
+            : meta.from && meta.from.length
+                ? meta.from
+                : contactEmail
+                    ? [contactEmail]
+                    : []
         : meta.to && meta.to.length
             ? meta.to
             : contactEmail

@@ -59,3 +59,31 @@ func TestAddressSet(t *testing.T) {
 		t.Fatalf("replyToSenderList() = %v", got)
 	}
 }
+
+func TestReplyToAddresses(t *testing.T) {
+	forms := imap.Address{Name: "Forms", Mailbox: "forms", Host: "example.com"}
+	visitor := imap.Address{Name: "Jane Doe", Mailbox: "Jane", Host: "Acme.test"}
+	tests := []struct {
+		name string
+		env  imap.Envelope
+		want []string
+	}{
+		{"reply-to differs from from", imap.Envelope{From: []imap.Address{forms}, ReplyTo: []imap.Address{visitor}}, []string{"jane@acme.test"}},
+		{"no reply-to", imap.Envelope{From: []imap.Address{forms}}, nil},
+		{"reply-to same as from", imap.Envelope{From: []imap.Address{forms}, ReplyTo: []imap.Address{forms}}, nil},
+		{"duplicates dropped", imap.Envelope{From: []imap.Address{forms}, ReplyTo: []imap.Address{visitor, visitor}}, []string{"jane@acme.test"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := replyToAddresses(&tt.env)
+			if len(got) != len(tt.want) {
+				t.Fatalf("replyToAddresses() = %v, want %v", got, tt.want)
+			}
+			for i := range got {
+				if got[i] != tt.want[i] {
+					t.Fatalf("replyToAddresses() = %v, want %v", got, tt.want)
+				}
+			}
+		})
+	}
+}
