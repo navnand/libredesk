@@ -407,3 +407,71 @@ describe('conversation read state', () => {
     expect(store.conversationMessages.map(message => message.uuid)).toEqual([oldMessage.uuid, reply.uuid])
   })
 })
+
+describe('catching up after missed live updates', () => {
+  const page = (results) => ({ data: { data: { results, page: 1, total_pages: 1, total: results.length } } })
+  const flush = () => new Promise(resolve => setTimeout(resolve, 0))
+
+  it('adds conversations created while the connection was down', async () => {
+    const store = useConversationStore()
+    api.getAllConversations.mockResolvedValueOnce(page([{ uuid: 'conversation-a', status: 'Open' }]))
+    await store.fetchConversationsList(false, 'all')
+
+    api.getAllConversations.mockResolvedValueOnce(page([{ uuid: 'conversation-b', status: 'Open' }, { uuid: 'conversation-a', status: 'Open' }]))
+    store.resyncAfterGap()
+    await flush()
+
+    expect(store.conversations.data.map(c => c.uuid)).toEqual(['conversation-b', 'conversation-a'])
+    expect(store.conversations.total).toBe(2)
+    expect(api.getSidebarCounts).toHaveBeenCalled()
+  })
+
+  it('loads the open conversation and its latest messages', async () => {
+    const store = setup()
+    api.getConversation.mockResolvedValueOnce({ data: { data: { uuid: 'conversation-a', status: 'Resolved' } } })
+    api.getConversationMessages.mockResolvedValueOnce({ data: { data: { results: [reply] } } })
+
+    store.resyncAfterGap()
+    await flush()
+
+    expect(store.conversation.data.status).toBe('Resolved')
+    expect(store.messages.data.hasMessage('conversation-a', reply.uuid)).toBe(true)
+  })
+
+  it('catches up when the socket reconnects, not on the first connect', () => {
+    const store = useConversationStore()
+    const resync = vi.spyOn(store, 'resyncAfterGap').mockImplementation(() => {})
+    const client = new WebSocketClient()
+    client.socket = { readyState: WebSocket.OPEN, send: vi.fn() }
+
+    client.handleOpen({ target: client.socket })
+    expect(resync).not.toHaveBeenCalled()
+
+    client.reconnectAttempts = 1
+    client.handleOpen({ target: client.socket })
+    expect(resync).toHaveBeenCalledTimes(1)
+    client.clearPing()
+  })
+
+  it('catches up when the page is shown again after a minute hidden', () => {
+    const store = useConversationStore()
+    const resync = vi.spyOn(store, 'resyncAfterGap').mockImplementation(() => {})
+    const client = new WebSocketClient()
+    client.setupNetworkListeners()
+    let hidden = false
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => hidden })
+    const now = vi.spyOn(Date, 'now')
+
+    const show = (at) => { now.mockReturnValue(at); hidden = false; document.dispatchEvent(new Event('visibilitychange')) }
+    const hide = (at) => { now.mockReturnValue(at); hidden = true; document.dispatchEvent(new Event('visibilitychange')) }
+
+    hide(1_000)
+    show(30_000)
+    expect(resync).not.toHaveBeenCalled()
+
+    hide(40_000)
+    show(100_000)
+    expect(resync).toHaveBeenCalledTimes(1)
+    now.mockRestore()
+  })
+})

@@ -950,6 +950,18 @@ export const useConversationStore = defineStore('conversation', () => {
     throttledFetchFirstPage()
   }
 
+  // Reloads the list's first page, sidebar counts and the open conversation, and marks cached messages stale.
+  function resyncAfterGap () {
+    if (conversations.listType) fetchFirstPageConversations()
+    refreshSidebarCounts()
+    for (const uuid of messages.data.cache.keys()) staleConversationUUIDs.add(uuid)
+    const openUUID = conversation.data?.uuid
+    if (openUUID) {
+      silentRefetchConversation(openUUID)
+      if (messages.data.hasConversation(openUUID)) fetchMessages(openUUID)
+    }
+  }
+
   function updateConversationLastMessage (uuid, message) {
     const conv = conversations.data?.find(c => c.uuid === uuid)
     if (!conv) return
@@ -1347,6 +1359,7 @@ export const useConversationStore = defineStore('conversation', () => {
     updatePriority,
     updateStatus,
     refreshConversationList,
+    resyncAfterGap,
     resetConversations,
     updateConversationLastMessage,
     fetchFirstPageConversations,

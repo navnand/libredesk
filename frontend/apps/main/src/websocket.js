@@ -26,6 +26,8 @@ export class WebSocketClient {
     this.messageQueue = []
     this.maxQueueSize = 50
     this.queueTimeoutMs = 30000
+    this.hiddenAt = 0
+    this.resyncAfterHiddenMs = 60000
   }
 
   init () {
@@ -68,6 +70,7 @@ export class WebSocketClient {
       this.subscribeListReplace(uuids)
       const openUUID = this.convStore.conversation.data?.uuid
       if (openUUID) this.subscribeToConversation(openUUID)
+      this.convStore.resyncAfterGap()
     }
   }
 
@@ -210,6 +213,17 @@ export class WebSocketClient {
         this.socket.close()
       }
       this.reconnect()
+    })
+
+    // Back on screen after at least a minute hidden: reload what may have been missed.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.hiddenAt = Date.now()
+        return
+      }
+      const hiddenFor = this.hiddenAt ? Date.now() - this.hiddenAt : 0
+      this.hiddenAt = 0
+      if (hiddenFor >= this.resyncAfterHiddenMs) this.convStore.resyncAfterGap()
     })
 
     window.addEventListener('focus', () => {
